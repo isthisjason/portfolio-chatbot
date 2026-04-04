@@ -6,4 +6,5 @@ compatibility_date = "2026-04-04"
 enabled = true
 
 [vars]
+AI_PROVIDER = "openai"
 OPENAI_MODEL = "gpt-4.1-mini"

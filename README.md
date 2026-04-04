@@ -86,7 +86,14 @@ wrangler secret put OPENAI_API_KEY
 
 Optional environment variables:
 
+- `AI_PROVIDER` with `openai` as the current implemented default
 - `OPENAI_MODEL`
+
+Provider notes:
+
+- the Worker now calls providers through a shared abstraction in `worker/providers/`
+- `openai` is implemented today
+- `anthropic` is scaffolded behind the same interface but not implemented yet
 
 ## API contract
 

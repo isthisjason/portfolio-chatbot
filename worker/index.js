@@ -6,6 +6,10 @@ import {
   buildChatSuccess,
   parseChatRequest,
 } from "./chat-contract.js";
+import {
+  generateChatReply,
+  validateProviderConfig,
+} from "./providers/index.js";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -32,53 +36,6 @@ function readContentLength(request) {
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-async function callOpenAI(messages, env) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: buildSystemPrompt(),
-        },
-        ...messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
-      ],
-      text: {
-        verbosity: "low",
-      },
-      max_output_tokens: 350,
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${detail}`);
-  }
-
-  const payload = await response.json();
-  const reply =
-    payload.output_text ||
-    payload.output
-      ?.flatMap((item) => item.content || [])
-      ?.filter((item) => item.type === "output_text")
-      ?.map((item) => item.text)
-      ?.join("\n")
-      ?.trim();
-
-  return (
-    reply ||
-    "I don't have enough documented context to answer that confidently yet."
-  );
 }
 
 export default {
@@ -139,11 +96,12 @@ export default {
       );
     }
 
-    if (!env.OPENAI_API_KEY) {
+    const providerConfig = validateProviderConfig(env);
+    if (!providerConfig.ok) {
       return json(
         buildChatError({
           code: "missing_provider_secret",
-          message: "Missing OPENAI_API_KEY secret in the Worker environment.",
+          message: `Missing required secret(s) for provider '${providerConfig.provider}': ${providerConfig.missingSecrets.join(", ")}.`,
           requestId,
         }),
         { status: 500 },
@@ -202,11 +160,16 @@ export default {
       }
 
       const { messages } = parsedRequest.data;
-      const reply = await callOpenAI(messages, env);
+      const result = await generateChatReply({
+        messages,
+        systemPrompt: buildSystemPrompt(),
+        env,
+      });
+
       return json(
         buildChatSuccess({
-          reply,
-          model: env.OPENAI_MODEL || "gpt-4.1-mini",
+          reply: result.reply,
+          model: result.model,
           grounded: true,
           requestId,
         }),
