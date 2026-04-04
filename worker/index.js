@@ -1,6 +1,7 @@
 import { buildSystemPrompt } from "./context.js";
 import {
   CHAT_API_PATH,
+  MAX_REQUEST_BODY_LENGTH,
   buildChatError,
   buildChatSuccess,
   parseChatRequest,
@@ -21,6 +22,16 @@ function json(data, init = {}) {
       ...(init.headers || {}),
     },
   });
+}
+
+function readContentLength(request) {
+  const raw = request.headers.get("content-length");
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function callOpenAI(messages, env) {
@@ -116,6 +127,18 @@ export default {
       );
     }
 
+    const contentLength = readContentLength(request);
+    if (contentLength !== null && contentLength > MAX_REQUEST_BODY_LENGTH) {
+      return json(
+        buildChatError({
+          code: "request_too_large",
+          message: `Request body must be ${MAX_REQUEST_BODY_LENGTH} bytes or fewer.`,
+          requestId,
+        }),
+        { status: 413 },
+      );
+    }
+
     if (!env.OPENAI_API_KEY) {
       return json(
         buildChatError({
@@ -128,7 +151,44 @@ export default {
     }
 
     try {
-      const payload = await request.json();
+      const rawBody = await request.text();
+
+      if (!rawBody.trim()) {
+        return json(
+          buildChatError({
+            code: "empty_body",
+            message: "Request body must not be empty.",
+            requestId,
+          }),
+          { status: 400 },
+        );
+      }
+
+      if (rawBody.length > MAX_REQUEST_BODY_LENGTH) {
+        return json(
+          buildChatError({
+            code: "request_too_large",
+            message: `Request body must be ${MAX_REQUEST_BODY_LENGTH} bytes or fewer.`,
+            requestId,
+          }),
+          { status: 413 },
+        );
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return json(
+          buildChatError({
+            code: "invalid_json",
+            message: "Request body must be valid JSON.",
+            requestId,
+          }),
+          { status: 400 },
+        );
+      }
+
       const parsedRequest = parseChatRequest(payload);
 
       if (!parsedRequest.ok) {

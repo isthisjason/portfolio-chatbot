@@ -3,6 +3,7 @@ export const CHAT_CONTRACT_VERSION = "2026-04-04";
 export const MAX_CHAT_MESSAGES = 10;
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_METADATA_LENGTH = 200;
+export const MAX_REQUEST_BODY_LENGTH = 25000;
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -10,6 +11,10 @@ function isPlainObject(value) {
 
 function truncate(value, maxLength = MAX_METADATA_LENGTH) {
   return String(value).slice(0, maxLength);
+}
+
+function hasOnlyAllowedKeys(object, allowedKeys) {
+  return Object.keys(object).every((key) => allowedKeys.includes(key));
 }
 
 export function buildChatSuccess({ reply, model, grounded = true, requestId }) {
@@ -49,6 +54,16 @@ export function parseChatRequest(body) {
     };
   }
 
+  if (!hasOnlyAllowedKeys(body, ["messages", "metadata"])) {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_request_fields",
+        message: "Only 'messages' and optional 'metadata' are allowed in the request body.",
+      },
+    };
+  }
+
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return {
       ok: false,
@@ -59,15 +74,35 @@ export function parseChatRequest(body) {
     };
   }
 
+  if (body.messages.length > MAX_CHAT_MESSAGES) {
+    return {
+      ok: false,
+      error: {
+        code: "too_many_messages",
+        message: `Request may include at most ${MAX_CHAT_MESSAGES} messages.`,
+      },
+    };
+  }
+
   const normalizedMessages = [];
 
-  for (const message of body.messages.slice(-MAX_CHAT_MESSAGES)) {
+  for (const message of body.messages) {
     if (!isPlainObject(message)) {
       return {
         ok: false,
         error: {
           code: "invalid_message",
           message: "Each message must be an object with role and content.",
+        },
+      };
+    }
+
+    if (!hasOnlyAllowedKeys(message, ["role", "content"])) {
+      return {
+        ok: false,
+        error: {
+          code: "unknown_message_fields",
+          message: "Each message may only include 'role' and 'content'.",
         },
       };
     }
@@ -82,7 +117,26 @@ export function parseChatRequest(body) {
       };
     }
 
-    const content = truncate(message.content || "", MAX_MESSAGE_LENGTH).trim();
+    if (typeof message.content !== "string") {
+      return {
+        ok: false,
+        error: {
+          code: "invalid_content_type",
+          message: "Each message content value must be a string.",
+        },
+      };
+    }
+
+    if (message.content.length > MAX_MESSAGE_LENGTH) {
+      return {
+        ok: false,
+        error: {
+          code: "message_too_long",
+          message: `Each message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`,
+        },
+      };
+    }
+    const content = message.content.trim();
     if (!content) {
       return {
         ok: false,
@@ -109,11 +163,40 @@ export function parseChatRequest(body) {
     };
   }
 
-  const metadata = isPlainObject(body.metadata)
+  if (body.metadata !== undefined && !isPlainObject(body.metadata)) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_metadata",
+        message: "Metadata must be an object when provided.",
+      },
+    };
+  }
+
+  if (body.metadata && !hasOnlyAllowedKeys(body.metadata, ["source", "pagePath", "sessionId"])) {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_metadata_fields",
+        message: "Metadata may only include 'source', 'pagePath', and 'sessionId'.",
+      },
+    };
+  }
+
+  const metadata = body.metadata
     ? {
-        source: body.metadata.source ? truncate(body.metadata.source) : undefined,
-        pagePath: body.metadata.pagePath ? truncate(body.metadata.pagePath) : undefined,
-        sessionId: body.metadata.sessionId ? truncate(body.metadata.sessionId) : undefined,
+        source:
+          typeof body.metadata.source === "string"
+            ? truncate(body.metadata.source)
+            : undefined,
+        pagePath:
+          typeof body.metadata.pagePath === "string"
+            ? truncate(body.metadata.pagePath)
+            : undefined,
+        sessionId:
+          typeof body.metadata.sessionId === "string"
+            ? truncate(body.metadata.sessionId)
+            : undefined,
       }
     : {};
 

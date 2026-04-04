@@ -113,9 +113,14 @@ Request body:
 Rules:
 
 - `messages` is required and must be a non-empty array
+- at most `10` messages are allowed per request
 - allowed roles are `user` and `assistant`
+- each message may only contain `role` and `content`
+- each `content` value must be a string of at most `4000` characters
 - the final message must be from `user`
 - `metadata` is optional and intended for non-sensitive request context
+- allowed metadata keys are `source`, `pagePath`, and `sessionId`
+- body must be valid JSON with `Content-Type: application/json`
 
 Success response:
 
