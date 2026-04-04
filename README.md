@@ -174,6 +174,56 @@ Current logging behavior:
 - avoids logging raw chat messages, request bodies, or API keys
 - keeps fallback behavior user-safe even when internal errors are logged
 
+## Worker Testing
+
+Test the Worker independently before relying on the widget.
+
+Start local Worker dev:
+
+```bash
+npm run dev:worker
+```
+
+In another terminal, run the smoke tests:
+
+```bash
+npm run test:worker
+```
+
+The smoke test script in `scripts/test-worker.mjs` always checks:
+
+- method validation
+- content-type validation
+- invalid JSON handling
+- payload validation
+
+Then it runs one scenario-specific check based on `WORKER_TEST_MODE`:
+
+- `missing-secret`:
+  expects a safe fallback response when the provider secret is not configured
+- `provider-failure`:
+  expects a safe fallback response when the configured provider throws
+- `success`:
+  expects a grounded non-fallback success response from a live configured provider
+
+Examples:
+
+```bash
+# default: missing secret fallback
+npm run test:worker
+
+# success mode with a real provider secret configured in local Worker dev
+WORKER_TEST_MODE=success npm run test:worker
+
+# provider failure mode, useful if local Worker dev is configured to use an unimplemented provider path
+WORKER_TEST_MODE=provider-failure npm run test:worker
+```
+
+Optional overrides:
+
+- `WORKER_BASE_URL` defaults to `http://127.0.0.1:8787`
+- `WORKER_TEST_ORIGIN` defaults to `http://localhost:4173`
+
 ## API contract
 
 `POST /api/chat`
