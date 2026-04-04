@@ -13,6 +13,15 @@ Embeddable recruiter-facing chatbot for a portfolio site. This project owns:
 portfolio-chatbot/
 ├── public/
 │   └── demo.html
+├── data/
+│   ├── README.md
+│   └── portfolio/
+│       ├── boundaries.js
+│       ├── experience.js
+│       ├── index.js
+│       ├── owner.js
+│       ├── projects.js
+│       └── stack.js
 ├── scripts/
 │   └── build-widget.mjs
 ├── src/
@@ -139,7 +148,7 @@ Error response:
 
 ## Grounding and guardrails
 
-The prompt logic lives in `worker/context.js`. Replace the placeholder data with real resume, portfolio, and project facts before launch.
+The prompt logic lives in `worker/context.js`, but the source data now lives under `data/portfolio/`. Update those files with real public resume, portfolio, and project facts before launch.
 
 Current guardrails:
 
