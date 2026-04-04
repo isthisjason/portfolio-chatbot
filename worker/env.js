@@ -27,6 +27,7 @@ export function getRuntimeConfig(env = {}) {
     anthropicModel: readString(env.ANTHROPIC_MODEL, DEFAULTS.anthropicModel),
     maxOutputTokens: readInteger(env.MAX_OUTPUT_TOKENS, DEFAULTS.maxOutputTokens),
     appEnvironment: readString(env.APP_ENV, DEFAULTS.appEnvironment),
+    allowedOrigins: readString(env.ALLOWED_ORIGINS),
   };
 }
 
@@ -46,5 +47,6 @@ export function getPublicRuntimeSummary(env = {}) {
     anthropicModel: config.anthropicModel,
     maxOutputTokens: config.maxOutputTokens,
     appEnvironment: config.appEnvironment,
+    allowedOrigins: config.allowedOrigins,
   };
 }

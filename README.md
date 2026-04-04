@@ -99,6 +99,7 @@ Non-sensitive environment variables live in `wrangler.toml` or local `.env` file
 - `ANTHROPIC_MODEL`
 - `MAX_OUTPUT_TOKENS`
 - `APP_ENV`
+- `ALLOWED_ORIGINS`
 
 Provider notes:
 
@@ -116,7 +117,24 @@ Config rules:
 
 - secrets belong in Worker secrets or local `.dev.vars`
 - model names and environment flags belong in `wrangler.toml` vars or local `.env`
+- CORS allowlists belong in `ALLOWED_ORIGINS` as a comma-separated list of exact origins
 - nothing sensitive should be added to committed source files
+
+## CORS
+
+The widget and Worker are separate origins, so CORS is part of the feature, not an afterthought.
+
+Current behavior:
+
+- in development, localhost origins such as `http://localhost:4173` and `http://127.0.0.1:4173` are allowed automatically
+- configured origins in `ALLOWED_ORIGINS` are always allowed
+- in production, any browser origin not in `ALLOWED_ORIGINS` is rejected with `403`
+- non-browser requests without an `Origin` header are still allowed
+
+Recommended setup:
+
+- local `.env`: `ALLOWED_ORIGINS=http://localhost:4173,http://127.0.0.1:4173`
+- production `wrangler.toml`: replace `https://your-portfolio-domain.example` with your real portfolio origin
 
 ## API contract
 

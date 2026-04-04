@@ -15,14 +15,9 @@ import {
   validateProviderConfig,
 } from "./providers/index.js";
 import { getPublicRuntimeSummary } from "./env.js";
+import { resolveCors } from "./cors.js";
 
-const corsHeaders = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-allow-headers": "content-type, authorization",
-};
-
-function json(data, init = {}) {
+function json(data, init = {}, corsHeaders = {}) {
   return new Response(JSON.stringify(data), {
     ...init,
     headers: {
@@ -48,7 +43,7 @@ function buildFallbackResponse({
   model = "fallback",
   provider,
   reason,
-}) {
+}, corsHeaders) {
   return json(
     buildChatSuccess({
       reply: buildRecruiterFallbackReply(),
@@ -59,6 +54,8 @@ function buildFallbackResponse({
       fallback: true,
       fallbackReason: reason,
     }),
+    {},
+    corsHeaders,
   );
 }
 
@@ -96,11 +93,24 @@ export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     const requestId = crypto.randomUUID();
+    const cors = resolveCors(request, env);
 
     if (request.method === "OPTIONS") {
+      if (!cors.allowed) {
+        return json(
+          buildChatError({
+            code: "origin_not_allowed",
+            message: "Origin is not allowed to access this API.",
+            requestId,
+          }),
+          { status: 403 },
+          cors.headers,
+        );
+      }
+
       return new Response(null, {
         status: 204,
-        headers: corsHeaders,
+        headers: cors.headers,
       });
     }
 
@@ -112,6 +122,19 @@ export default {
           requestId,
         }),
         { status: 404 },
+        cors.headers,
+      );
+    }
+
+    if (!cors.allowed) {
+      return json(
+        buildChatError({
+          code: "origin_not_allowed",
+          message: "Origin is not allowed to access this API.",
+          requestId,
+        }),
+        { status: 403 },
+        cors.headers,
       );
     }
 
@@ -123,6 +146,7 @@ export default {
           requestId,
         }),
         { status: 405 },
+        cors.headers,
       );
     }
 
@@ -135,6 +159,7 @@ export default {
           requestId,
         }),
         { status: 415 },
+        cors.headers,
       );
     }
 
@@ -147,6 +172,7 @@ export default {
           requestId,
         }),
         { status: 413 },
+        cors.headers,
       );
     }
 
@@ -160,7 +186,7 @@ export default {
         requestId,
         provider: providerConfig.provider,
         reason: "missing_provider_secret",
-      });
+      }, cors.headers);
     }
 
     try {
@@ -174,6 +200,7 @@ export default {
             requestId,
           }),
           { status: 400 },
+          cors.headers,
         );
       }
 
@@ -185,6 +212,7 @@ export default {
             requestId,
           }),
           { status: 413 },
+          cors.headers,
         );
       }
 
@@ -199,6 +227,7 @@ export default {
             requestId,
           }),
           { status: 400 },
+          cors.headers,
         );
       }
 
@@ -211,6 +240,7 @@ export default {
             requestId,
           }),
           { status: 400 },
+          cors.headers,
         );
       }
 
@@ -227,7 +257,7 @@ export default {
           model: result.model,
           provider: result.provider,
           reason: "under_grounded_reply",
-        });
+        }, cors.headers);
       }
 
       return json(
@@ -238,13 +268,15 @@ export default {
           grounded: true,
           requestId,
         }),
+        {},
+        cors.headers,
       );
     } catch (error) {
       console.error(error);
       return buildFallbackResponse({
         requestId,
         reason: "provider_failure",
-      });
+      }, cors.headers);
     }
   },
 };
