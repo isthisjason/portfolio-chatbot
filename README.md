@@ -163,6 +163,17 @@ Notes:
 - it is good enough as a first pass for recruiter-facing widget traffic
 - if traffic grows, the next step is durable rate limiting with Cloudflare KV, Durable Objects, or another shared store
 
+## Logging
+
+The Worker uses structured logs for debugging without dumping user message content.
+
+Current logging behavior:
+
+- logs request IDs with CORS blocks, abuse blocks, provider config issues, and provider failures
+- logs provider name, model, status code, and failure category when available
+- avoids logging raw chat messages, request bodies, or API keys
+- keeps fallback behavior user-safe even when internal errors are logged
+
 ## API contract
 
 `POST /api/chat`

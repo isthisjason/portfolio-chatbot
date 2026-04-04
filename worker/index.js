@@ -14,9 +14,10 @@ import {
   generateChatReply,
   validateProviderConfig,
 } from "./providers/index.js";
-import { getPublicRuntimeSummary } from "./env.js";
 import { resolveCors } from "./cors.js";
 import { checkAbuseProtection } from "./abuse.js";
+import { logError, logInfo, logWarn } from "./logger.js";
+import { ProviderError } from "./providers/provider-error.js";
 
 function json(data, init = {}, corsHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -98,6 +99,7 @@ export default {
 
     if (request.method === "OPTIONS") {
       if (!cors.allowed) {
+        logWarn("cors.preflight_blocked", { requestId, origin: cors.origin }, env);
         return json(
           buildChatError({
             code: "origin_not_allowed",
@@ -109,6 +111,7 @@ export default {
         );
       }
 
+      logInfo("cors.preflight_allowed", { requestId, origin: cors.origin }, env);
       return new Response(null, {
         status: 204,
         headers: cors.headers,
@@ -128,6 +131,7 @@ export default {
     }
 
     if (!cors.allowed) {
+      logWarn("cors.origin_blocked", { requestId, origin: cors.origin }, env);
       return json(
         buildChatError({
           code: "origin_not_allowed",
@@ -179,9 +183,14 @@ export default {
 
     const providerConfig = validateProviderConfig(env);
     if (!providerConfig.ok) {
-      const runtimeSummary = getPublicRuntimeSummary(env);
-      console.error(
-        `Missing required secret(s) for provider '${providerConfig.provider}' in environment '${runtimeSummary.appEnvironment}': ${providerConfig.missingSecrets.join(", ")}.`,
+      logError(
+        "provider.config_missing_secret",
+        {
+          requestId,
+          provider: providerConfig.provider,
+          missingSecrets: providerConfig.missingSecrets,
+        },
+        env,
       );
       return buildFallbackResponse({
         requestId,
@@ -254,6 +263,16 @@ export default {
       });
 
       if (!abuseCheck.ok) {
+        logWarn(
+          "abuse.request_blocked",
+          {
+            requestId,
+            code: abuseCheck.error.code,
+            retryAfterSeconds: abuseCheck.retryAfterSeconds,
+            origin: cors.origin,
+          },
+          env,
+        );
         return json(
           buildChatError({
             ...abuseCheck.error,
@@ -276,6 +295,15 @@ export default {
       });
 
       if (isUnderGroundedReply(result.reply)) {
+        logWarn(
+          "chat.under_grounded_reply",
+          {
+            requestId,
+            provider: result.provider,
+            model: result.model,
+          },
+          env,
+        );
         return buildFallbackResponse({
           requestId,
           model: result.model,
@@ -296,7 +324,29 @@ export default {
         cors.headers,
       );
     } catch (error) {
-      console.error(error);
+      if (error instanceof ProviderError) {
+        logError(
+          "provider.request_failed",
+          {
+            requestId,
+            provider: error.provider,
+            statusCode: error.statusCode,
+            category: error.category,
+            retryable: error.retryable,
+          },
+          env,
+        );
+      } else {
+        logError(
+          "chat.unexpected_failure",
+          {
+            requestId,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+          env,
+        );
+      }
       return buildFallbackResponse({
         requestId,
         reason: "provider_failure",

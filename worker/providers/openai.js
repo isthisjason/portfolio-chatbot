@@ -1,4 +1,5 @@
 import { getRuntimeConfig, getProviderSecrets } from "../env.js";
+import { ProviderError } from "./provider-error.js";
 
 function extractOpenAIReply(payload) {
   return (
@@ -47,8 +48,12 @@ export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${detail}`);
+    throw new ProviderError("OpenAI request failed.", {
+      provider: "openai",
+      statusCode: response.status,
+      category: response.status >= 500 ? "provider_upstream_error" : "provider_request_rejected",
+      retryable: response.status >= 500 || response.status === 429,
+    });
   }
 
   const payload = await response.json();
