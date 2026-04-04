@@ -1,6 +1,7 @@
 name = "chatbot-assistant-api"
 main = "worker/index.js"
 compatibility_date = "2026-04-04"
+workers_dev = true
 
 [observability]
 enabled = true
@@ -8,6 +9,20 @@ enabled = true
 [vars]
 APP_ENV = "production"
 ALLOWED_ORIGINS = "https://your-portfolio-domain.example"
+AI_PROVIDER = "openai"
+OPENAI_MODEL = "gpt-4.1-mini"
+ANTHROPIC_MODEL = "claude-3-5-sonnet-latest"
+MAX_OUTPUT_TOKENS = "350"
+RATE_LIMIT_WINDOW_MS = "60000"
+RATE_LIMIT_MAX_REQUESTS = "12"
+DUPLICATE_MESSAGE_THRESHOLD = "3"
+
+[env.preview]
+workers_dev = true
+
+[env.preview.vars]
+APP_ENV = "preview"
+ALLOWED_ORIGINS = "https://preview.your-portfolio-domain.example"
 AI_PROVIDER = "openai"
 OPENAI_MODEL = "gpt-4.1-mini"
 ANTHROPIC_MODEL = "claude-3-5-sonnet-latest"

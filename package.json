@@ -8,6 +8,8 @@
     "build:widget": "node ./scripts/build-widget.mjs",
     "dev:worker": "wrangler dev worker/index.js",
     "deploy:worker": "wrangler deploy",
+    "deploy:worker:preview": "wrangler deploy --env preview",
+    "deploy:worker:production": "wrangler deploy",
     "preview:demo": "python3 -m http.server 4173",
     "test:worker": "node ./scripts/test-worker.mjs"
   },

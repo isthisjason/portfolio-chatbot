@@ -76,6 +76,13 @@ Use a script tag once the widget assets are published from this repo:
 
 The widget mounts itself into a Shadow DOM container, so its styles stay isolated from the TanStack/Vite portfolio.
 
+Recommended Worker URL shape:
+
+- production API base URL: `https://chatbot-assistant-api.<your-cloudflare-subdomain>.workers.dev`
+- preview API base URL: `https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev`
+
+The widget should reference the API base URL, not the full `/api/chat` path. The widget appends `/api/chat` internally.
+
 ## Worker secrets
 
 Use Worker secrets for provider API keys. Do not commit secrets to the repo.
@@ -90,6 +97,13 @@ Optional provider secret:
 
 ```bash
 wrangler secret put ANTHROPIC_API_KEY
+```
+
+Preview secret setup:
+
+```bash
+wrangler secret put OPENAI_API_KEY --env preview
+wrangler secret put ANTHROPIC_API_KEY --env preview
 ```
 
 Non-sensitive environment variables live in `wrangler.toml` or local `.env` files:
@@ -122,6 +136,75 @@ Config rules:
 - model names and environment flags belong in `wrangler.toml` vars or local `.env`
 - CORS allowlists belong in `ALLOWED_ORIGINS` as a comma-separated list of exact origins
 - nothing sensitive should be added to committed source files
+
+## Deployment
+
+The Worker is configured for both production and preview deployment through Wrangler.
+
+Available deploy commands:
+
+```bash
+npm run deploy:worker:preview
+npm run deploy:worker:production
+```
+
+Environment layout:
+
+- default Wrangler environment:
+  production Worker named `chatbot-assistant-api`
+- `preview` Wrangler environment:
+  preview Worker named `chatbot-assistant-api-preview`
+
+Production URL shape:
+
+```text
+https://chatbot-assistant-api.<your-cloudflare-subdomain>.workers.dev
+```
+
+Preview URL shape:
+
+```text
+https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev
+```
+
+Before deploying:
+
+1. Set production secrets with `wrangler secret put`.
+2. Set preview secrets with `wrangler secret put --env preview`.
+3. Replace placeholder origins in `wrangler.toml` with your real portfolio origins.
+4. Keep `window.PortfolioChatbotConfig.apiBaseUrl` in the portfolio pointed at the correct Worker base URL.
+
+Example production embed:
+
+```html
+<script>
+  window.PortfolioChatbotConfig = {
+    apiBaseUrl:
+      "https://chatbot-assistant-api.<your-cloudflare-subdomain>.workers.dev",
+    title: "Ask Jason",
+    subtitle: "Ask about experience, projects, strengths, and stack.",
+  };
+</script>
+<script
+  src="https://your-widget-cdn.example.com/widget.js"
+  defer
+></script>
+```
+
+Example preview embed:
+
+```html
+<script>
+  window.PortfolioChatbotConfig = {
+    apiBaseUrl:
+      "https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev",
+  };
+</script>
+<script
+  src="https://your-preview-widget-cdn.example.com/widget.js"
+  defer
+></script>
+```
 
 ## CORS
 
