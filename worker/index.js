@@ -18,6 +18,11 @@ import { resolveCors } from "./cors.js";
 import { checkAbuseProtection } from "./abuse.js";
 import { logError, logInfo, logWarn } from "./logger.js";
 import { ProviderError } from "./providers/provider-error.js";
+import {
+  buildSensitiveRefusalReply,
+  enforceResponseGuardrails,
+  isSensitivePersonalQuestion,
+} from "./guardrails.js";
 
 function json(data, init = {}, corsHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -255,6 +260,28 @@ export default {
       }
 
       const { messages } = parsedRequest.data;
+      const latestUserMessage = messages.at(-1)?.content || "";
+
+      if (isSensitivePersonalQuestion(latestUserMessage)) {
+        logWarn(
+          "guardrail.sensitive_question_refused",
+          { requestId },
+          env,
+        );
+        return json(
+          buildChatSuccess({
+            reply: buildSensitiveRefusalReply(),
+            model: "guardrail",
+            grounded: true,
+            requestId,
+            refusal: true,
+            refusalReason: "sensitive_personal_question",
+          }),
+          {},
+          cors.headers,
+        );
+      }
+
       const abuseCheck = checkAbuseProtection({
         request,
         metadata: parsedRequest.data.metadata,
@@ -294,13 +321,47 @@ export default {
         env,
       });
 
-      if (isUnderGroundedReply(result.reply)) {
+      const guardedResponse = enforceResponseGuardrails({
+        userMessage: latestUserMessage,
+        reply: result.reply,
+      });
+
+      if (guardedResponse.kind === "refusal") {
         logWarn(
-          "chat.under_grounded_reply",
+          "guardrail.response_refused",
           {
             requestId,
             provider: result.provider,
             model: result.model,
+            reason: guardedResponse.guardrailReason,
+          },
+          env,
+        );
+        return json(
+          buildChatSuccess({
+            reply: guardedResponse.reply,
+            model: result.model,
+            provider: result.provider,
+            grounded: true,
+            requestId,
+            refusal: true,
+            refusalReason: guardedResponse.guardrailReason,
+          }),
+          {},
+          cors.headers,
+        );
+      }
+
+      if (isUnderGroundedReply(result.reply) || guardedResponse.kind === "fallback") {
+        logWarn(
+          "chat.guardrail_fallback",
+          {
+            requestId,
+            provider: result.provider,
+            model: result.model,
+            reason:
+              guardedResponse.guardrailReason ||
+              "under_grounded_reply",
           },
           env,
         );
@@ -308,13 +369,15 @@ export default {
           requestId,
           model: result.model,
           provider: result.provider,
-          reason: "under_grounded_reply",
+          reason:
+            guardedResponse.guardrailReason ||
+            "under_grounded_reply",
         }, cors.headers);
       }
 
       return json(
         buildChatSuccess({
-          reply: result.reply,
+          reply: guardedResponse.reply,
           model: result.model,
           provider: result.provider,
           grounded: true,

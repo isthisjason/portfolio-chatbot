@@ -11,7 +11,8 @@
     "deploy:worker:preview": "wrangler deploy --env preview",
     "deploy:worker:production": "wrangler deploy",
     "preview:demo": "python3 -m http.server 4173",
-    "test:worker": "node ./scripts/test-worker.mjs"
+    "test:worker": "node ./scripts/test-worker.mjs",
+    "test:guardrails": "node ./scripts/test-guardrails.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.10.0"

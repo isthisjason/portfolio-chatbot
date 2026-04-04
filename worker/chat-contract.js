@@ -25,6 +25,8 @@ export function buildChatSuccess({
   provider,
   fallback = false,
   fallbackReason,
+  refusal = false,
+  refusalReason,
 }) {
   return {
     reply,
@@ -35,6 +37,8 @@ export function buildChatSuccess({
       grounded,
       fallback,
       ...(fallbackReason ? { fallbackReason } : {}),
+      refusal,
+      ...(refusalReason ? { refusalReason } : {}),
       contractVersion: CHAT_CONTRACT_VERSION,
     },
   };

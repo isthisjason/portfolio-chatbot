@@ -257,6 +257,21 @@ Current logging behavior:
 - avoids logging raw chat messages, request bodies, or API keys
 - keeps fallback behavior user-safe even when internal errors are logged
 
+## Launch Guardrails
+
+Before calling Phase 2 complete, the Worker now enforces and verifies these launch-ready guardrails:
+
+- unsupported-claim-risk responses are converted into a safe fallback
+- sensitive personal questions get a refusal before provider output is shown
+- missing-context answers are normalized into an honest fallback
+- successful answers are trimmed into concise recruiter-facing length
+
+Run the guardrail checks:
+
+```bash
+npm run test:guardrails
+```
+
 ## Worker Testing
 
 Test the Worker independently before relying on the widget.
