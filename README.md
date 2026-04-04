@@ -224,6 +224,38 @@ Optional overrides:
 - `WORKER_BASE_URL` defaults to `http://127.0.0.1:8787`
 - `WORKER_TEST_ORIGIN` defaults to `http://localhost:4173`
 
+## Local Widget Integration
+
+Once the Worker API is stable, test the real widget flow against local `wrangler dev`.
+
+Run these in separate terminals:
+
+```bash
+npm run dev:worker
+npm run build
+npm run preview:demo
+```
+
+Then open:
+
+- `http://127.0.0.1:4173/public/demo.html`
+- or `http://127.0.0.1:4173/dist/demo.html`
+
+The demo points to `http://127.0.0.1:8787` by default and stores overrides in local storage.
+
+You can also override the API target with a query param:
+
+```text
+http://127.0.0.1:4173/public/demo.html?apiBaseUrl=http://127.0.0.1:8787
+```
+
+What to verify in the widget:
+
+- real chat flow returns concise grounded answers
+- fallback replies are visually labeled when the Worker returns a safe fallback
+- network or API failures show a calm error state
+- the widget status line shows whether it is connected to the local Worker
+
 ## API contract
 
 `POST /api/chat`

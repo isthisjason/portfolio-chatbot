@@ -1,4 +1,4 @@
-const STYLE_TEXT = "__WIDGET_CSS__";
+const STYLE_TEXT = __WIDGET_CSS__;
 
 const DEFAULT_CONFIG = {
   title: "Ask Jason",
@@ -19,6 +19,7 @@ const EMBED_SCRIPT_CONFIG = (() => {
 const state = {
   mounted: false,
   open: false,
+  pending: false,
   elements: {},
   config: { ...DEFAULT_CONFIG },
   conversation: [],
@@ -58,8 +59,13 @@ function renderMessages() {
   messages.innerHTML = state.conversation
     .map(
       (message) => `
-        <div class="pcw-message ${message.role}">
-          ${escapeHtml(message.content)}
+        <div class="pcw-message ${message.role} ${message.kind || "default"}">
+          <div>${escapeHtml(message.content)}</div>
+          ${
+            message.note
+              ? `<div class="pcw-message-note">${escapeHtml(message.note)}</div>`
+              : ""
+          }
         </div>
       `,
     )
@@ -70,6 +76,13 @@ function renderMessages() {
 
 function setStatus(message = "") {
   state.elements.status.textContent = message;
+}
+
+function setPending(nextPending) {
+  state.pending = nextPending;
+  state.elements.send.disabled = nextPending;
+  state.elements.input.disabled = nextPending;
+  state.elements.send.textContent = nextPending ? "Sending..." : "Send";
 }
 
 function setOpen(nextOpen) {
@@ -92,6 +105,7 @@ async function submitMessage(content) {
   state.conversation.push({ role: "user", content: message });
   renderMessages();
   setStatus("Thinking...");
+  setPending(true);
 
   state.elements.input.value = "";
   autoResizeTextarea(state.elements.input);
@@ -120,24 +134,34 @@ async function submitMessage(content) {
       );
     }
     const reply = payload?.reply?.trim();
+    const isFallback = payload?.meta?.fallback === true;
+    const fallbackReason = payload?.meta?.fallbackReason;
 
     state.conversation.push({
       role: "assistant",
+      kind: isFallback ? "fallback" : "default",
+      note: isFallback
+        ? `Fallback response${fallbackReason ? `: ${fallbackReason.replaceAll("_", " ")}` : ""}`
+        : "",
       content:
         reply ||
         "I couldn't find a grounded answer in the portfolio context yet.",
     });
     renderMessages();
-    setStatus("");
+    setStatus(isFallback ? "Showing safe fallback response" : "Connected to local Worker");
   } catch (error) {
     console.error("[portfolio-chatbot] request failed", error);
     state.conversation.push({
       role: "assistant",
+      kind: "error",
+      note: "Network or API error",
       content:
         "I'm having trouble reaching the portfolio assistant right now. Please try again in a moment.",
     });
     renderMessages();
     setStatus("Connection issue");
+  } finally {
+    setPending(false);
   }
 }
 
@@ -289,6 +313,7 @@ function mountWidget(overrides = {}) {
     close: shadowRoot.querySelector(".pcw-close"),
     form: shadowRoot.querySelector(".pcw-form"),
     input: shadowRoot.querySelector(".pcw-input"),
+    send: shadowRoot.querySelector(".pcw-send"),
     messages: shadowRoot.querySelector(".pcw-messages"),
     starters: shadowRoot.querySelector(".pcw-starters"),
     status: shadowRoot.querySelector(".pcw-status"),
@@ -296,6 +321,11 @@ function mountWidget(overrides = {}) {
 
   attachEventHandlers();
   autoResizeTextarea(state.elements.input);
+  setStatus(
+    state.config.apiBaseUrl
+      ? `Ready for ${state.config.apiBaseUrl}/api/chat`
+      : "Set apiBaseUrl to connect the widget",
+  );
   return state;
 }
 

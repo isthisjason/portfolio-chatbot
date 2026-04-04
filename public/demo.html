@@ -65,13 +65,26 @@
         Configure the API target with <code>window.PortfolioChatbotConfig</code>
         or a <code>data-api-base-url</code> attribute on the embed script.
       </p>
+      <p>
+        Local demo target:
+        <code id="api-target">http://127.0.0.1:8787</code>
+      </p>
     </main>
 
     <script>
+      const params = new URLSearchParams(window.location.search);
+      const apiBaseUrl =
+        params.get("apiBaseUrl") ||
+        window.localStorage.getItem("portfolio-chatbot-demo-api") ||
+        "http://127.0.0.1:8787";
+
+      document.getElementById("api-target").textContent = apiBaseUrl;
+      window.localStorage.setItem("portfolio-chatbot-demo-api", apiBaseUrl);
+
       window.PortfolioChatbotConfig = {
-        apiBaseUrl: "http://127.0.0.1:8787",
+        apiBaseUrl,
       };
     </script>
-    <script src="../dist/widget.js" data-api-base-url="http://127.0.0.1:8787"></script>
+    <script src="../dist/widget.js"></script>
   </body>
 </html>
