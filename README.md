@@ -79,6 +79,64 @@ Optional environment variables:
 
 - `OPENAI_MODEL`
 
+## API contract
+
+`POST /api/chat`
+
+Request body:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "What kind of engineer is Jason?"
+    }
+  ],
+  "metadata": {
+    "source": "portfolio-widget",
+    "pagePath": "/",
+    "sessionId": "3e4b8d6e-1f6b-47d9-bf3f-2f2a0b5937cb"
+  }
+}
+```
+
+Rules:
+
+- `messages` is required and must be a non-empty array
+- allowed roles are `user` and `assistant`
+- the final message must be from `user`
+- `metadata` is optional and intended for non-sensitive request context
+
+Success response:
+
+```json
+{
+  "reply": "Jason comes across as a product-minded full-stack engineer with strong emphasis on grounded execution.",
+  "meta": {
+    "requestId": "2c68b72c-65b7-4d46-bc26-31fe5d4a6a4d",
+    "model": "gpt-4.1-mini",
+    "grounded": true,
+    "contractVersion": "2026-04-04"
+  }
+}
+```
+
+Error response:
+
+```json
+{
+  "error": {
+    "code": "invalid_messages",
+    "message": "Request body must include a non-empty messages array."
+  },
+  "meta": {
+    "requestId": "017c53f1-7ec3-42c0-9427-0c5c5a6d37b7",
+    "contractVersion": "2026-04-04"
+  }
+}
+```
+
 ## Grounding and guardrails
 
 The prompt logic lives in `worker/context.js`. Replace the placeholder data with real resume, portfolio, and project facts before launch.

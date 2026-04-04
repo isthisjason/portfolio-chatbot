@@ -24,6 +24,20 @@ const state = {
   conversation: [],
 };
 
+function getSessionId() {
+  const key = "portfolio-chatbot-session-id";
+  const existingValue = window.sessionStorage.getItem(key);
+
+  if (existingValue) {
+    return existingValue;
+  }
+
+  const nextValue =
+    window.crypto?.randomUUID?.() || `pcw-${Date.now()}-${Math.random()}`;
+  window.sessionStorage.setItem(key, nextValue);
+  return nextValue;
+}
+
 function escapeHtml(value) {
   return value
     .replaceAll("&", "&amp;")
@@ -92,15 +106,19 @@ async function submitMessage(content) {
         messages: state.conversation,
         metadata: {
           source: "portfolio-widget",
+          pagePath: window.location.pathname,
+          sessionId: getSessionId(),
         },
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
-
     const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error?.message || `Request failed with status ${response.status}`,
+      );
+    }
     const reply = payload?.reply?.trim();
 
     state.conversation.push({

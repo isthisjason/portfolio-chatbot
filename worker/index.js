@@ -1,4 +1,10 @@
 import { buildSystemPrompt } from "./context.js";
+import {
+  CHAT_API_PATH,
+  buildChatError,
+  buildChatSuccess,
+  parseChatRequest,
+} from "./chat-contract.js";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -15,16 +21,6 @@ function json(data, init = {}) {
       ...(init.headers || {}),
     },
   });
-}
-
-function normalizeMessages(messages = []) {
-  return messages
-    .filter((message) => message?.content && ["user", "assistant"].includes(message.role))
-    .slice(-10)
-    .map((message) => ({
-      role: message.role,
-      content: String(message.content).slice(0, 4000),
-    }));
 }
 
 async function callOpenAI(messages, env) {
@@ -77,6 +73,7 @@ async function callOpenAI(messages, env) {
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
+    const requestId = crypto.randomUUID();
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -85,49 +82,84 @@ export default {
       });
     }
 
-    if (pathname !== "/api/chat") {
-      return json({ error: "Not found" }, { status: 404 });
+    if (pathname !== CHAT_API_PATH) {
+      return json(
+        buildChatError({
+          code: "not_found",
+          message: "Route not found.",
+          requestId,
+        }),
+        { status: 404 },
+      );
     }
 
     if (request.method !== "POST") {
-      return json({ error: "Method not allowed" }, { status: 405 });
+      return json(
+        buildChatError({
+          code: "method_not_allowed",
+          message: "Use POST for this endpoint.",
+          requestId,
+        }),
+        { status: 405 },
+      );
+    }
+
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      return json(
+        buildChatError({
+          code: "unsupported_content_type",
+          message: "Content-Type must be application/json.",
+          requestId,
+        }),
+        { status: 415 },
+      );
     }
 
     if (!env.OPENAI_API_KEY) {
       return json(
-        {
-          error: "Missing OPENAI_API_KEY secret in the Worker environment.",
-        },
+        buildChatError({
+          code: "missing_provider_secret",
+          message: "Missing OPENAI_API_KEY secret in the Worker environment.",
+          requestId,
+        }),
         { status: 500 },
       );
     }
 
     try {
       const payload = await request.json();
-      const messages = normalizeMessages(payload?.messages);
+      const parsedRequest = parseChatRequest(payload);
 
-      if (!messages.length) {
+      if (!parsedRequest.ok) {
         return json(
-          { error: "At least one user message is required." },
+          buildChatError({
+            ...parsedRequest.error,
+            requestId,
+          }),
           { status: 400 },
         );
       }
 
+      const { messages } = parsedRequest.data;
       const reply = await callOpenAI(messages, env);
-      return json({
-        reply,
-        meta: {
+      return json(
+        buildChatSuccess({
+          reply,
           model: env.OPENAI_MODEL || "gpt-4.1-mini",
           grounded: true,
-        },
-      });
+          requestId,
+        }),
+      );
     } catch (error) {
       console.error(error);
       return json(
-        {
-          error: "Unable to complete the chat request.",
-          detail: error instanceof Error ? error.message : "Unknown error",
-        },
+        buildChatError({
+          code: "chat_request_failed",
+          message: "Unable to complete the chat request.",
+          details: error instanceof Error ? error.message : "Unknown error",
+          requestId,
+        }),
         { status: 500 },
       );
     }
