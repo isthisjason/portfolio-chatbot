@@ -1,0 +1,16 @@
+{
+  "name": "chatbot-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:widget",
+    "build:widget": "node ./scripts/build-widget.mjs",
+    "dev:worker": "wrangler dev worker/index.js",
+    "deploy:worker": "wrangler deploy",
+    "preview:demo": "python3 -m http.server 4173"
+  },
+  "devDependencies": {
+    "wrangler": "^4.10.0"
+  }
+}

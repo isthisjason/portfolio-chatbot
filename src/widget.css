@@ -1,0 +1,237 @@
+:host {
+  all: initial;
+}
+
+.pcw-root,
+.pcw-root * {
+  box-sizing: border-box;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.pcw-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483000;
+  color: #101828;
+}
+
+.pcw-launcher {
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.28), transparent 40%),
+    linear-gradient(135deg, #0f172a 0%, #0b3b66 48%, #0e7490 100%);
+  color: #ffffff;
+  box-shadow:
+    0 18px 40px rgba(2, 6, 23, 0.28),
+    0 6px 14px rgba(14, 116, 144, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.pcw-launcher:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 22px 50px rgba(2, 6, 23, 0.3),
+    0 8px 18px rgba(14, 116, 144, 0.33);
+}
+
+.pcw-launcher:focus-visible,
+.pcw-close:focus-visible,
+.pcw-send:focus-visible,
+.pcw-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.pcw-panel {
+  width: min(380px, calc(100vw - 24px));
+  height: min(620px, calc(100vh - 96px));
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.98));
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow:
+    0 30px 80px rgba(15, 23, 42, 0.24),
+    0 8px 20px rgba(14, 116, 144, 0.18);
+  display: none;
+  flex-direction: column;
+  backdrop-filter: blur(16px);
+}
+
+.pcw-panel.is-open {
+  display: flex;
+}
+
+.pcw-header {
+  padding: 18px 18px 14px;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(12, 74, 110, 0.96));
+  color: #f8fafc;
+}
+
+.pcw-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pcw-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.76;
+}
+
+.pcw-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pcw-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(241, 245, 249, 0.86);
+}
+
+.pcw-close {
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.pcw-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+  flex: 1;
+}
+
+.pcw-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.pcw-message {
+  max-width: 92%;
+  padding: 12px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.pcw-message.assistant {
+  align-self: flex-start;
+  background: #eff6ff;
+  color: #172554;
+  border-bottom-left-radius: 8px;
+}
+
+.pcw-message.user {
+  align-self: flex-end;
+  background: #0f172a;
+  color: #f8fafc;
+  border-bottom-right-radius: 8px;
+}
+
+.pcw-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pcw-starter {
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  background: rgba(14, 116, 144, 0.06);
+  color: #0f172a;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.pcw-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.pcw-input {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: #0f172a;
+  resize: none;
+  min-height: 52px;
+  max-height: 132px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pcw-send {
+  border: 0;
+  background: linear-gradient(135deg, #0f172a, #0e7490);
+  color: #ffffff;
+  min-width: 88px;
+  height: 52px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pcw-status {
+  font-size: 12px;
+  color: #475467;
+  min-height: 18px;
+}
+
+.pcw-footnote {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #667085;
+}
+
+@media (max-width: 640px) {
+  .pcw-root {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+  }
+
+  .pcw-panel {
+    width: 100%;
+    height: min(70vh, 620px);
+    margin-left: auto;
+  }
+
+  .pcw-launcher {
+    margin-left: auto;
+    display: flex;
+  }
+}

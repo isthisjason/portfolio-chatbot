@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio Chatbot Demo</title>
+    <style>
+      :root {
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: #e2e8f0;
+        background:
+          radial-gradient(circle at top, rgba(14, 116, 144, 0.22), transparent 35%),
+          linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      main {
+        width: min(860px, 100%);
+        border-radius: 28px;
+        padding: 40px;
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        box-shadow: 0 40px 90px rgba(2, 6, 23, 0.38);
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: clamp(2rem, 5vw, 3.75rem);
+        line-height: 1;
+      }
+
+      p {
+        margin: 0 0 16px;
+        max-width: 56ch;
+        color: #cbd5e1;
+        line-height: 1.6;
+      }
+
+      code {
+        color: #7dd3fc;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>Recruiter Demo</p>
+      <h1>Jason's Portfolio Assistant</h1>
+      <p>
+        This page shows the floating widget in isolation. In production, the
+        portfolio can load the same widget via a script tag while the chat API
+        stays hosted on its own Cloudflare Worker.
+      </p>
+      <p>
+        Configure the API target with <code>window.PortfolioChatbotConfig</code>
+        or a <code>data-api-base-url</code> attribute on the embed script.
+      </p>
+    </main>
+
+    <script>
+      window.PortfolioChatbotConfig = {
+        apiBaseUrl: "http://127.0.0.1:8787",
+      };
+    </script>
+    <script src="../dist/widget.js" data-api-base-url="http://127.0.0.1:8787"></script>
+  </body>
+</html>
