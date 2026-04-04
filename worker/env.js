@@ -4,6 +4,9 @@ const DEFAULTS = {
   anthropicModel: "claude-3-5-sonnet-latest",
   maxOutputTokens: 350,
   appEnvironment: "development",
+  rateLimitWindowMs: 60000,
+  rateLimitMaxRequests: 12,
+  duplicateMessageThreshold: 3,
 };
 
 function readString(value, fallback = "") {
@@ -28,6 +31,18 @@ export function getRuntimeConfig(env = {}) {
     maxOutputTokens: readInteger(env.MAX_OUTPUT_TOKENS, DEFAULTS.maxOutputTokens),
     appEnvironment: readString(env.APP_ENV, DEFAULTS.appEnvironment),
     allowedOrigins: readString(env.ALLOWED_ORIGINS),
+    rateLimitWindowMs: readInteger(
+      env.RATE_LIMIT_WINDOW_MS,
+      DEFAULTS.rateLimitWindowMs,
+    ),
+    rateLimitMaxRequests: readInteger(
+      env.RATE_LIMIT_MAX_REQUESTS,
+      DEFAULTS.rateLimitMaxRequests,
+    ),
+    duplicateMessageThreshold: readInteger(
+      env.DUPLICATE_MESSAGE_THRESHOLD,
+      DEFAULTS.duplicateMessageThreshold,
+    ),
   };
 }
 
@@ -48,5 +63,8 @@ export function getPublicRuntimeSummary(env = {}) {
     maxOutputTokens: config.maxOutputTokens,
     appEnvironment: config.appEnvironment,
     allowedOrigins: config.allowedOrigins,
+    rateLimitWindowMs: config.rateLimitWindowMs,
+    rateLimitMaxRequests: config.rateLimitMaxRequests,
+    duplicateMessageThreshold: config.duplicateMessageThreshold,
   };
 }

@@ -16,6 +16,7 @@ import {
 } from "./providers/index.js";
 import { getPublicRuntimeSummary } from "./env.js";
 import { resolveCors } from "./cors.js";
+import { checkAbuseProtection } from "./abuse.js";
 
 function json(data, init = {}, corsHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -245,6 +246,29 @@ export default {
       }
 
       const { messages } = parsedRequest.data;
+      const abuseCheck = checkAbuseProtection({
+        request,
+        metadata: parsedRequest.data.metadata,
+        messages,
+        env,
+      });
+
+      if (!abuseCheck.ok) {
+        return json(
+          buildChatError({
+            ...abuseCheck.error,
+            requestId,
+          }),
+          {
+            status: 429,
+            headers: {
+              "retry-after": String(abuseCheck.retryAfterSeconds),
+            },
+          },
+          cors.headers,
+        );
+      }
+
       const result = await generateChatReply({
         messages,
         systemPrompt: buildSystemPrompt(),

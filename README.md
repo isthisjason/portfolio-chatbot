@@ -100,6 +100,9 @@ Non-sensitive environment variables live in `wrangler.toml` or local `.env` file
 - `MAX_OUTPUT_TOKENS`
 - `APP_ENV`
 - `ALLOWED_ORIGINS`
+- `RATE_LIMIT_WINDOW_MS`
+- `RATE_LIMIT_MAX_REQUESTS`
+- `DUPLICATE_MESSAGE_THRESHOLD`
 
 Provider notes:
 
@@ -135,6 +138,30 @@ Recommended setup:
 
 - local `.env`: `ALLOWED_ORIGINS=http://localhost:4173,http://127.0.0.1:4173`
 - production `wrangler.toml`: replace `https://your-portfolio-domain.example` with your real portfolio origin
+
+## Abuse Protection
+
+The Worker includes a lightweight abuse layer before provider calls.
+
+Current protections:
+
+- request body size limits
+- message count and message length validation
+- origin allowlist checks
+- per-client in-memory rate limiting using IP, origin, and request source
+- duplicate-burst detection for repeated user messages
+
+Current defaults:
+
+- `RATE_LIMIT_WINDOW_MS=60000`
+- `RATE_LIMIT_MAX_REQUESTS=12`
+- `DUPLICATE_MESSAGE_THRESHOLD=3`
+
+Notes:
+
+- this rate limiting is isolate-local, so it is intentionally lightweight rather than durable
+- it is good enough as a first pass for recruiter-facing widget traffic
+- if traffic grows, the next step is durable rate limiting with Cloudflare KV, Durable Objects, or another shared store
 
 ## API contract
 
