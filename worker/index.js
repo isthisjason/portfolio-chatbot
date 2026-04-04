@@ -1,4 +1,8 @@
-import { buildSystemPrompt } from "./context.js";
+import {
+  buildRecruiterFallbackReply,
+  buildSystemPrompt,
+  getFallbackMessage,
+} from "./context.js";
 import {
   CHAT_API_PATH,
   MAX_REQUEST_BODY_LENGTH,
@@ -36,6 +40,55 @@ function readContentLength(request) {
 
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildFallbackResponse({
+  requestId,
+  model = "fallback",
+  provider,
+  reason,
+}) {
+  return json(
+    buildChatSuccess({
+      reply: buildRecruiterFallbackReply(),
+      model,
+      provider,
+      grounded: false,
+      requestId,
+      fallback: true,
+      fallbackReason: reason,
+    }),
+  );
+}
+
+function isUnderGroundedReply(reply) {
+  if (!reply || typeof reply !== "string") {
+    return true;
+  }
+
+  const normalizedReply = reply.trim();
+  if (!normalizedReply) {
+    return true;
+  }
+
+  const fallbackMessage = getFallbackMessage().toLowerCase();
+  const lowerReply = normalizedReply.toLowerCase();
+
+  if (lowerReply === fallbackMessage) {
+    return true;
+  }
+
+  const lowConfidenceSignals = [
+    "i don't know",
+    "i dont know",
+    "not enough context",
+    "not enough information",
+    "insufficient context",
+    "can't answer that confidently",
+    "cannot answer that confidently",
+  ];
+
+  return lowConfidenceSignals.some((signal) => lowerReply.includes(signal));
 }
 
 export default {
@@ -98,14 +151,14 @@ export default {
 
     const providerConfig = validateProviderConfig(env);
     if (!providerConfig.ok) {
-      return json(
-        buildChatError({
-          code: "missing_provider_secret",
-          message: `Missing required secret(s) for provider '${providerConfig.provider}': ${providerConfig.missingSecrets.join(", ")}.`,
-          requestId,
-        }),
-        { status: 500 },
+      console.error(
+        `Missing required secret(s) for provider '${providerConfig.provider}': ${providerConfig.missingSecrets.join(", ")}.`,
       );
+      return buildFallbackResponse({
+        requestId,
+        provider: providerConfig.provider,
+        reason: "missing_provider_secret",
+      });
     }
 
     try {
@@ -166,25 +219,30 @@ export default {
         env,
       });
 
+      if (isUnderGroundedReply(result.reply)) {
+        return buildFallbackResponse({
+          requestId,
+          model: result.model,
+          provider: result.provider,
+          reason: "under_grounded_reply",
+        });
+      }
+
       return json(
         buildChatSuccess({
           reply: result.reply,
           model: result.model,
+          provider: result.provider,
           grounded: true,
           requestId,
         }),
       );
     } catch (error) {
       console.error(error);
-      return json(
-        buildChatError({
-          code: "chat_request_failed",
-          message: "Unable to complete the chat request.",
-          details: error instanceof Error ? error.message : "Unknown error",
-          requestId,
-        }),
-        { status: 500 },
-      );
+      return buildFallbackResponse({
+        requestId,
+        reason: "provider_failure",
+      });
     }
   },
 };

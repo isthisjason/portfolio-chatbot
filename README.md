@@ -137,7 +137,26 @@ Success response:
   "meta": {
     "requestId": "2c68b72c-65b7-4d46-bc26-31fe5d4a6a4d",
     "model": "gpt-4.1-mini",
+    "provider": "openai",
     "grounded": true,
+    "fallback": false,
+    "contractVersion": "2026-04-04"
+  }
+}
+```
+
+Safe fallback response:
+
+```json
+{
+  "reply": "I don't have enough documented context to answer that confidently yet. You can ask about Jason's projects like Prairie Amber Cattery or CashFlowGo, or about experience, stack, and strengths instead.",
+  "meta": {
+    "requestId": "173a7c92-2df8-4914-bff0-11e2a71d4704",
+    "model": "fallback",
+    "provider": "openai",
+    "grounded": false,
+    "fallback": true,
+    "fallbackReason": "provider_failure",
     "contractVersion": "2026-04-04"
   }
 }
@@ -168,6 +187,7 @@ Current guardrails:
 - concise recruiter-facing tone
 - fallback when evidence is missing
 - refusal for sensitive personal information or invented claims
+- safe recruiter-facing fallback when the provider fails or configuration is missing
 
 ## Suggested next steps
 

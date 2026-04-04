@@ -17,13 +17,24 @@ function hasOnlyAllowedKeys(object, allowedKeys) {
   return Object.keys(object).every((key) => allowedKeys.includes(key));
 }
 
-export function buildChatSuccess({ reply, model, grounded = true, requestId }) {
+export function buildChatSuccess({
+  reply,
+  model,
+  grounded = true,
+  requestId,
+  provider,
+  fallback = false,
+  fallbackReason,
+}) {
   return {
     reply,
     meta: {
       requestId,
       model,
+      ...(provider ? { provider } : {}),
       grounded,
+      fallback,
+      ...(fallbackReason ? { fallbackReason } : {}),
       contractVersion: CHAT_CONTRACT_VERSION,
     },
   };

@@ -31,11 +31,30 @@ function buildContextPayload(warnings) {
   };
 }
 
+export function getFallbackMessage() {
+  return (
+    portfolioContext.boundaries.fallbackMessage ||
+    "I don't have enough documented context to answer that confidently yet."
+  );
+}
+
+export function buildRecruiterFallbackReply() {
+  const fallbackMessage = getFallbackMessage();
+  const topics = portfolioContext.projects
+    .map((project) => project.name)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (!topics.length) {
+    return `${fallbackMessage} You can ask about ${portfolioContext.owner.publicLabel}'s experience, technical stack, or documented strengths instead.`;
+  }
+
+  return `${fallbackMessage} You can ask about ${portfolioContext.owner.publicLabel}'s projects like ${topics.join(" or ")}, or about experience, stack, and strengths instead.`;
+}
+
 export function buildSystemPrompt() {
   const warnings = validatePortfolioData(portfolioContext);
-  const fallbackMessage =
-    portfolioContext.boundaries.fallbackMessage ||
-    "I don't have enough documented context to answer that confidently yet.";
+  const fallbackMessage = getFallbackMessage();
   const allowedTopics = portfolioContext.boundaries.allowedTopics
     .map((topic) => `- ${topic}`)
     .join("\n");

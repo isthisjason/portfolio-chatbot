@@ -52,8 +52,6 @@ export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
   return {
     provider: "openai",
     model,
-    reply:
-      reply ||
-      "I don't have enough documented context to answer that confidently yet.",
+    reply,
   };
 }
