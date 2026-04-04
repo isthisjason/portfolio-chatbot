@@ -14,6 +14,7 @@ import {
   generateChatReply,
   validateProviderConfig,
 } from "./providers/index.js";
+import { getPublicRuntimeSummary } from "./env.js";
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -151,8 +152,9 @@ export default {
 
     const providerConfig = validateProviderConfig(env);
     if (!providerConfig.ok) {
+      const runtimeSummary = getPublicRuntimeSummary(env);
       console.error(
-        `Missing required secret(s) for provider '${providerConfig.provider}': ${providerConfig.missingSecrets.join(", ")}.`,
+        `Missing required secret(s) for provider '${providerConfig.provider}' in environment '${runtimeSummary.appEnvironment}': ${providerConfig.missingSecrets.join(", ")}.`,
       );
       return buildFallbackResponse({
         requestId,

@@ -1,3 +1,5 @@
+import { getRuntimeConfig, getProviderSecrets } from "../env.js";
+
 function extractOpenAIReply(payload) {
   return (
     payload.output_text ||
@@ -11,16 +13,19 @@ function extractOpenAIReply(payload) {
 }
 
 export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
-  if (!env.OPENAI_API_KEY) {
+  const runtimeConfig = getRuntimeConfig(env);
+  const secrets = getProviderSecrets(env);
+
+  if (!secrets.openaiApiKey) {
     throw new Error("Missing OPENAI_API_KEY secret in the Worker environment.");
   }
 
-  const model = env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = runtimeConfig.openAIModel;
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      authorization: `Bearer ${secrets.openaiApiKey}`,
     },
     body: JSON.stringify({
       model,
@@ -37,7 +42,7 @@ export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
       text: {
         verbosity: "low",
       },
-      max_output_tokens: 350,
+      max_output_tokens: runtimeConfig.maxOutputTokens,
     }),
   });
 

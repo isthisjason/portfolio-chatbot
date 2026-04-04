@@ -78,22 +78,45 @@ The widget mounts itself into a Shadow DOM container, so its styles stay isolate
 
 ## Worker secrets
 
-Set the OpenAI API key before deploying:
+Use Worker secrets for provider API keys. Do not commit secrets to the repo.
+
+Production secret setup:
 
 ```bash
 wrangler secret put OPENAI_API_KEY
 ```
 
-Optional environment variables:
+Optional provider secret:
+
+```bash
+wrangler secret put ANTHROPIC_API_KEY
+```
+
+Non-sensitive environment variables live in `wrangler.toml` or local `.env` files:
 
 - `AI_PROVIDER` with `openai` as the current implemented default
 - `OPENAI_MODEL`
+- `ANTHROPIC_MODEL`
+- `MAX_OUTPUT_TOKENS`
+- `APP_ENV`
 
 Provider notes:
 
 - the Worker now calls providers through a shared abstraction in `worker/providers/`
 - `openai` is implemented today
 - `anthropic` is scaffolded behind the same interface but not implemented yet
+
+Local development setup:
+
+1. Copy `.dev.vars.example` to `.dev.vars` and add your real provider secret.
+2. Copy `.env.example` to `.env` if you want local non-sensitive overrides.
+3. Run `npm run dev:worker`.
+
+Config rules:
+
+- secrets belong in Worker secrets or local `.dev.vars`
+- model names and environment flags belong in `wrangler.toml` vars or local `.env`
+- nothing sensitive should be added to committed source files
 
 ## API contract
 

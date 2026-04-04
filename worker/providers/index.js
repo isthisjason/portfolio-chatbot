@@ -1,5 +1,6 @@
 import { generateAnthropicChatReply } from "./anthropic.js";
 import { generateOpenAIChatReply } from "./openai.js";
+import { getProviderSecrets, getRuntimeConfig } from "../env.js";
 
 const PROVIDERS = {
   anthropic: {
@@ -13,7 +14,7 @@ const PROVIDERS = {
 };
 
 export function getActiveProvider(env) {
-  const requestedProvider = String(env.AI_PROVIDER || "openai").trim().toLowerCase();
+  const requestedProvider = getRuntimeConfig(env).aiProvider;
   return PROVIDERS[requestedProvider]
     ? requestedProvider
     : "openai";
@@ -21,8 +22,19 @@ export function getActiveProvider(env) {
 
 export function validateProviderConfig(env) {
   const provider = getActiveProvider(env);
+  const secrets = getProviderSecrets(env);
   const missingSecrets = PROVIDERS[provider].requiredSecrets.filter(
-    (secretName) => !env[secretName],
+    (secretName) => {
+      if (secretName === "OPENAI_API_KEY") {
+        return !secrets.openaiApiKey;
+      }
+
+      if (secretName === "ANTHROPIC_API_KEY") {
+        return !secrets.anthropicApiKey;
+      }
+
+      return true;
+    },
   );
 
   if (missingSecrets.length) {
