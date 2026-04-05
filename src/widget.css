@@ -111,7 +111,7 @@
 
 .pcw-header-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
@@ -132,7 +132,7 @@
 
 .pcw-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
 }
 
@@ -175,6 +175,14 @@
   min-height: 0;
   gap: 8px;
   flex: 1;
+}
+
+.pcw-turnstile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .pcw-messages {
@@ -340,39 +348,9 @@
 
 .pcw-send:disabled,
 .pcw-input:disabled,
-.pcw-clear:disabled,
-.pcw-retry:disabled {
+.pcw-clear:disabled {
   cursor: not-allowed;
   opacity: 0.62;
-}
-
-.pcw-controls {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.pcw-retry {
-  border: 1px solid rgba(15, 23, 42, 0.2);
-  background: rgba(248, 250, 252, 0.95);
-  color: #0f172a;
-  border-radius: 999px;
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.pcw-status {
-  font-size: 11px;
-  color: #475467;
-  min-height: 15px;
-}
-
-.pcw-footnote {
-  font-size: 10px;
-  line-height: 1.4;
-  color: #94a3b8;
 }
 
 @keyframes pcw-pulse {

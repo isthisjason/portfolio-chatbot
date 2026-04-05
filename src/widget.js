@@ -3,6 +3,10 @@ const EMBED_CONTRACT_VERSION = "1.0.0";
 const WIDGET_GLOBAL_NAME = "PortfolioChatbotWidget";
 const CONFIG_GLOBAL_NAME = "PortfolioChatbotConfig";
 const WIDGET_HOST_ID = "portfolio-chatbot-widget";
+const TURNSTILE_SCRIPT_ID = "pcw-turnstile-script";
+const TURNSTILE_SCRIPT_SRC =
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+const TURNSTILE_CONTAINER_ID = "pcw-turnstile-container";
 
 const DEFAULT_CONFIG = {
   title: "Ask Jason",
@@ -11,6 +15,7 @@ const DEFAULT_CONFIG = {
   analyticsEnabled: true,
   source: "portfolio-widget",
   turnstileToken: "",
+  turnstileSiteKey: "",
   starterQuestions: [
     "What kind of engineer is Jason?",
     "Which project best demonstrates full-stack ownership?",
@@ -34,10 +39,12 @@ const state = {
   startersVisible: true,
   animateNextAssistant: false,
   activeTyping: null,
+  turnstileWidgetId: null,
   elements: {},
   config: { ...DEFAULT_CONFIG },
   conversation: [],
 };
+let turnstileLoadPromise = null;
 
 function getSessionId() {
   const key = "portfolio-chatbot-session-id";
@@ -115,6 +122,10 @@ function normalizeConfig(config = {}) {
     ),
     source: normalizeString(config.source, DEFAULT_CONFIG.source),
     turnstileToken: normalizeString(config.turnstileToken),
+    turnstileSiteKey: normalizeString(
+      config.turnstileSiteKey,
+      DEFAULT_CONFIG.turnstileSiteKey,
+    ),
     starterQuestions: normalizeStarterQuestions(config.starterQuestions),
   };
 }
@@ -143,6 +154,109 @@ function buildRequestMessages(conversation) {
         typeof message.content === "string" &&
         message.content.trim().length > 0,
     );
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function ensureTurnstileApiLoaded() {
+  if (window.turnstile) {
+    return Promise.resolve();
+  }
+
+  if (turnstileLoadPromise) {
+    return turnstileLoadPromise;
+  }
+
+  turnstileLoadPromise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(TURNSTILE_SCRIPT_ID);
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Turnstile script failed to load.")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = TURNSTILE_SCRIPT_ID;
+    script.src = TURNSTILE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(new Error("Turnstile script failed to load."));
+    document.head.appendChild(script);
+  });
+
+  return turnstileLoadPromise;
+}
+
+async function ensureTurnstileWidget() {
+  if (!state.config.turnstileSiteKey) {
+    return null;
+  }
+
+  await ensureTurnstileApiLoaded();
+
+  if (state.turnstileWidgetId !== null) {
+    return state.turnstileWidgetId;
+  }
+
+  let container = document.getElementById(TURNSTILE_CONTAINER_ID);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = TURNSTILE_CONTAINER_ID;
+    container.setAttribute(
+      "style",
+      "position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;pointer-events:none;overflow:hidden;z-index:-1;",
+    );
+    document.body.appendChild(container);
+  }
+
+  state.turnstileWidgetId = window.turnstile.render(container, {
+    sitekey: state.config.turnstileSiteKey,
+    size: "compact",
+    execution: "execute",
+  });
+
+  return state.turnstileWidgetId;
+}
+
+async function acquireTurnstileToken() {
+  if (state.config.turnstileToken) {
+    return state.config.turnstileToken;
+  }
+
+  if (!state.config.turnstileSiteKey) {
+    return "";
+  }
+
+  const widgetId = await ensureTurnstileWidget();
+  if (widgetId === null || widgetId === undefined) {
+    return "";
+  }
+
+  try {
+    window.turnstile.reset(widgetId);
+  } catch {}
+
+  window.turnstile.execute(widgetId);
+
+  const maxWaitMs = 7000;
+  const stepMs = 100;
+  for (let elapsed = 0; elapsed < maxWaitMs; elapsed += stepMs) {
+    const token = window.turnstile.getResponse(widgetId);
+    if (token) {
+      return token;
+    }
+    await sleep(stepMs);
+  }
+
+  throw new Error("Turnstile token acquisition timed out.");
 }
 
 function trackEvent(event, metadata = {}) {
@@ -274,8 +388,8 @@ function renderMessages() {
   }
 }
 
-function setStatus(message = "") {
-  state.elements.status.textContent = message;
+function setStatus(_message = "") {
+  // status display removed
 }
 
 function setPending(nextPending) {
@@ -283,7 +397,6 @@ function setPending(nextPending) {
   state.elements.send.disabled = nextPending;
   state.elements.input.disabled = nextPending;
   state.elements.clear.disabled = nextPending;
-  state.elements.retry.disabled = nextPending || !state.lastUserMessage;
   state.elements.send.textContent = nextPending ? "Sending..." : "Send";
   renderMessages();
 }
@@ -293,7 +406,6 @@ function setOpen(nextOpen) {
   state.open = nextOpen;
   state.elements.panel.classList.toggle("is-open", nextOpen);
   state.elements.launcher.setAttribute("aria-expanded", String(nextOpen));
-  state.elements.retry.disabled = state.pending || !state.lastUserMessage;
 
   if (nextOpen) {
     if (!wasOpen) {
@@ -405,6 +517,8 @@ async function submitMessage(content) {
   autoResizeTextarea(state.elements.input);
 
   try {
+    const turnstileToken = await acquireTurnstileToken();
+
     const response = await fetch(`${state.config.apiBaseUrl}/api/chat`, {
       method: "POST",
       headers: {
@@ -412,7 +526,7 @@ async function submitMessage(content) {
       },
       body: JSON.stringify({
         messages: buildRequestMessages(state.conversation),
-        turnstileToken: state.config.turnstileToken || undefined,
+        turnstileToken: turnstileToken || undefined,
         metadata: {
           source: state.config.source,
           pagePath: window.location.pathname,
@@ -498,7 +612,6 @@ function attachEventHandlers() {
     launcher,
     close,
     clear,
-    retry,
     form,
     input,
     messages,
@@ -507,7 +620,6 @@ function attachEventHandlers() {
   launcher.addEventListener("click", () => setOpen(!state.open));
   close.addEventListener("click", () => setOpen(false));
   clear.addEventListener("click", clearConversation);
-  retry.addEventListener("click", retryLastMessage);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -562,9 +674,7 @@ function createMarkup(config) {
         <header class="pcw-header">
           <div class="pcw-header-row">
             <div>
-              <p class="pcw-eyebrow">Portfolio Assistant</p>
               <h2 class="pcw-title">${escapeHtml(config.title)}</h2>
-              <p class="pcw-subtitle">${escapeHtml(config.subtitle)}</p>
             </div>
             <div class="pcw-header-actions">
               <button class="pcw-clear" type="button" aria-label="Clear chat">
@@ -592,22 +702,12 @@ function createMarkup(config) {
               id="pcw-input"
               class="pcw-input"
               rows="1"
-              placeholder="Ask a recruiter-style question..."
+              placeholder="Ask a question..."
               aria-label="Ask a question about Jason's experience"
             ></textarea>
             <button class="pcw-send" type="submit">Send</button>
           </form>
 
-          <div class="pcw-controls">
-            <button class="pcw-retry" type="button" aria-label="Retry last question">
-              Retry Last
-            </button>
-          </div>
-
-          <div class="pcw-status" role="status" aria-live="polite"></div>
-          <div class="pcw-footnote">
-            Recruiter-facing responses stay concise, grounded, and explicit when context is incomplete.
-          </div>
         </div>
       </div>
 
@@ -669,6 +769,11 @@ function resolveConfig(overrides = {}) {
       globalConfig.turnstileToken ||
       scriptConfig.turnstileToken ||
       DEFAULT_CONFIG.turnstileToken,
+    turnstileSiteKey:
+      overrides.turnstileSiteKey ||
+      globalConfig.turnstileSiteKey ||
+      scriptConfig.turnstileSiteKey ||
+      DEFAULT_CONFIG.turnstileSiteKey,
   };
 
   return normalizeConfig(mergedConfig);
@@ -695,12 +800,10 @@ function mountWidget(overrides = {}) {
     launcher: shadowRoot.querySelector(".pcw-launcher"),
     close: shadowRoot.querySelector(".pcw-close"),
     clear: shadowRoot.querySelector(".pcw-clear"),
-    retry: shadowRoot.querySelector(".pcw-retry"),
     form: shadowRoot.querySelector(".pcw-form"),
     input: shadowRoot.querySelector(".pcw-input"),
     send: shadowRoot.querySelector(".pcw-send"),
     messages: shadowRoot.querySelector(".pcw-messages"),
-    status: shadowRoot.querySelector(".pcw-status"),
   };
 
   attachEventHandlers();
@@ -724,6 +827,7 @@ function unmountWidget() {
   state.mounted = false;
   state.open = false;
   state.pending = false;
+  state.turnstileWidgetId = null;
   state.elements = {};
   state.conversation = [];
 }

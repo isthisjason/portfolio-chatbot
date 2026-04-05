@@ -8,7 +8,7 @@ enabled = true
 
 [vars]
 APP_ENV = "production"
-ALLOWED_ORIGINS = "https://jasonpeng.dev,https://jasonpengdevsite.shuangzp.workers.dev"
+ALLOWED_ORIGINS = "https://jasonpeng.dev,https://www.jasonpeng.dev,https://jasonpengdevsite.shuangzp.workers.dev"
 AI_PROVIDER = "openai"
 OPENAI_MODEL = "gpt-4.1-mini"
 ANTHROPIC_MODEL = "claude-3-5-sonnet-latest"
@@ -19,14 +19,14 @@ RATE_LIMIT_MIN_INTERVAL_MS = "1200"
 UNTRUSTED_RATE_LIMIT_MAX_REQUESTS = "4"
 DUPLICATE_MESSAGE_THRESHOLD = "3"
 ALLOWED_SOURCES = "portfolio-widget,worker-test"
-TURNSTILE_REQUIRED = "false"
+TURNSTILE_REQUIRED = "true"
 
 [env.preview]
 workers_dev = true
 
 [env.preview.vars]
 APP_ENV = "preview"
-ALLOWED_ORIGINS = "https://jasonpeng.dev,https://jasonpengdevsite.shuangzp.workers.dev"
+ALLOWED_ORIGINS = "https://jasonpeng.dev,https://www.jasonpeng.dev,https://jasonpengdevsite.shuangzp.workers.dev"
 AI_PROVIDER = "openai"
 OPENAI_MODEL = "gpt-4.1-mini"
 ANTHROPIC_MODEL = "claude-3-5-sonnet-latest"
@@ -37,4 +37,4 @@ RATE_LIMIT_MIN_INTERVAL_MS = "1200"
 UNTRUSTED_RATE_LIMIT_MAX_REQUESTS = "4"
 DUPLICATE_MESSAGE_THRESHOLD = "3"
 ALLOWED_SOURCES = "portfolio-widget,worker-test"
-TURNSTILE_REQUIRED = "false"
+TURNSTILE_REQUIRED = "true"
