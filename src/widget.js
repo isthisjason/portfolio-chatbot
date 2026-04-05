@@ -31,6 +31,9 @@ const state = {
   reconnectNotified: false,
   lastUserMessage: "",
   previousFocusedElement: null,
+  startersVisible: true,
+  animateNextAssistant: false,
+  activeTyping: null,
   elements: {},
   config: { ...DEFAULT_CONFIG },
   conversation: [],
@@ -170,16 +173,54 @@ function trackEvent(event, metadata = {}) {
 
 function autoResizeTextarea(textarea) {
   textarea.style.height = "0px";
-  textarea.style.height = `${Math.min(textarea.scrollHeight, 132)}px`;
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+}
+
+function typeIntoElement(el, text) {
+  if (state.activeTyping) {
+    state.activeTyping.cancelled = true;
+  }
+  const ctrl = { cancelled: false };
+  state.activeTyping = ctrl;
+
+  // 20ms per tick; for long responses batch chars to stay under ~4s total
+  const MS_PER_TICK = 20;
+  const MAX_DURATION_MS = 4000;
+  const charsPerTick = Math.max(1, Math.ceil(text.length / (MAX_DURATION_MS / MS_PER_TICK)));
+  let i = 0;
+  el.textContent = "";
+
+  function step() {
+    if (ctrl.cancelled || !el.isConnected) return;
+    i = Math.min(i + charsPerTick, text.length);
+    el.textContent = text.slice(0, i);
+    state.elements.messages.scrollTop = state.elements.messages.scrollHeight;
+    if (i < text.length) {
+      setTimeout(step, MS_PER_TICK);
+    } else {
+      state.activeTyping = null;
+    }
+  }
+  setTimeout(step, MS_PER_TICK);
 }
 
 function renderMessages() {
   const { messages } = state.elements;
-  const conversationHtml = state.conversation
+
+  const shouldAnimate =
+    state.animateNextAssistant &&
+    state.conversation.length > 0 &&
+    state.conversation[state.conversation.length - 1].role === "assistant";
+
+  const visibleConversation = shouldAnimate
+    ? state.conversation.slice(0, -1)
+    : state.conversation;
+
+  const conversationHtml = visibleConversation
     .map(
       (message) => `
         <div class="pcw-message ${message.role} ${message.kind || "default"}">
-          <div>${escapeHtml(message.content)}</div>
+          <div class="pcw-message-text">${escapeHtml(message.content)}</div>
           ${
             message.note
               ? `<div class="pcw-message-note">${escapeHtml(message.note)}</div>`
@@ -189,6 +230,16 @@ function renderMessages() {
       `,
     )
     .join("");
+
+  const animatedMsgHtml = shouldAnimate
+    ? (() => {
+        const msg = state.conversation[state.conversation.length - 1];
+        return `<div class="pcw-message ${msg.role} ${msg.kind || "default"} pcw-typing-target">
+          <div class="pcw-message-text"></div>
+          ${msg.note ? `<div class="pcw-message-note">${escapeHtml(msg.note)}</div>` : ""}
+        </div>`;
+      })()
+    : "";
 
   const pendingHtml = state.pending
     ? `
@@ -200,9 +251,27 @@ function renderMessages() {
     `
     : "";
 
-  messages.innerHTML = `${conversationHtml}${pendingHtml}`;
+  const startersHtml =
+    state.startersVisible && state.conversation.length <= 1 && !state.pending
+      ? `<div class="pcw-starters-inline">${state.config.starterQuestions
+          .map(
+            (q) =>
+              `<button class="pcw-starter" type="button" data-starter="${escapeHtml(q)}">${escapeHtml(q)}</button>`,
+          )
+          .join("")}</div>`
+      : "";
 
+  messages.innerHTML = `${conversationHtml}${animatedMsgHtml}${pendingHtml}${startersHtml}`;
   messages.scrollTop = messages.scrollHeight;
+
+  if (shouldAnimate) {
+    state.animateNextAssistant = false;
+    const target = messages.querySelector(".pcw-typing-target div");
+    if (target) {
+      const msg = state.conversation[state.conversation.length - 1];
+      typeIntoElement(target, msg.content);
+    }
+  }
 }
 
 function setStatus(message = "") {
@@ -290,6 +359,7 @@ function clearConversation() {
     },
   ];
   state.lastUserMessage = "";
+  state.startersVisible = true;
   setStatus("Conversation cleared");
   setPending(false);
   renderMessages();
@@ -388,7 +458,7 @@ async function submitMessage(content) {
         reply ||
         "I couldn't find a grounded answer in the portfolio context yet.",
     });
-    renderMessages();
+    state.animateNextAssistant = true;
     if (state.hasConnectionIssue) {
       state.hasConnectionIssue = false;
       state.reconnectNotified = true;
@@ -413,7 +483,7 @@ async function submitMessage(content) {
         ? `I couldn't complete that request. ${detail}`
         : "I couldn't reach the portfolio assistant just now. You can retry the last question or wait a moment and try again.",
     });
-    renderMessages();
+    state.animateNextAssistant = true;
     setStatus("Connection issue. Retry is available.");
     trackEvent("error", {
       statusCode: 0,
@@ -431,7 +501,7 @@ function attachEventHandlers() {
     retry,
     form,
     input,
-    starters,
+    messages,
   } = state.elements;
 
   launcher.addEventListener("click", () => setOpen(!state.open));
@@ -452,7 +522,7 @@ function attachEventHandlers() {
     }
   });
 
-  starters.addEventListener("click", async (event) => {
+  messages.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-starter]");
 
     if (!button) {
@@ -460,6 +530,14 @@ function attachEventHandlers() {
     }
 
     const value = button.getAttribute("data-starter") || "";
+
+    const startersEl = messages.querySelector(".pcw-starters-inline");
+    if (startersEl) {
+      startersEl.classList.add("is-hiding");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    state.startersVisible = false;
+
     if (!state.open) {
       setOpen(true);
     }
@@ -470,16 +548,6 @@ function attachEventHandlers() {
 }
 
 function createMarkup(config) {
-  const starterButtons = config.starterQuestions
-    .map(
-      (question) => `
-        <button class="pcw-starter" type="button" data-starter="${escapeHtml(question)}">
-          ${escapeHtml(question)}
-        </button>
-      `,
-    )
-    .join("");
-
   return `
     <style>${STYLE_TEXT}</style>
     <div class="pcw-root">
@@ -515,8 +583,6 @@ function createMarkup(config) {
               Ask about experience, projects, stack, or strengths. Replies stay concise and grounded in documented portfolio context.
             </div>
           </div>
-
-          <div class="pcw-starters">${starterButtons}</div>
 
           <form class="pcw-form">
             <label class="pcw-visually-hidden" for="pcw-input">
@@ -634,7 +700,6 @@ function mountWidget(overrides = {}) {
     input: shadowRoot.querySelector(".pcw-input"),
     send: shadowRoot.querySelector(".pcw-send"),
     messages: shadowRoot.querySelector(".pcw-messages"),
-    starters: shadowRoot.querySelector(".pcw-starters"),
     status: shadowRoot.querySelector(".pcw-status"),
   };
 

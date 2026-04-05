@@ -42,6 +42,17 @@
     0 8px 18px rgba(14, 116, 144, 0.33);
 }
 
+.pcw-launcher[aria-expanded="true"] {
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 40%),
+    linear-gradient(135deg, #0c4a6e 0%, #0369a1 100%);
+  transform: rotate(90deg);
+}
+
+.pcw-launcher[aria-expanded="true"]:hover {
+  transform: rotate(90deg) translateY(-2px);
+}
+
 .pcw-launcher:focus-visible,
 .pcw-close:focus-visible,
 .pcw-clear:focus-visible,
@@ -53,6 +64,9 @@
 }
 
 .pcw-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
   width: min(380px, calc(100vw - 24px));
   height: min(620px, calc(100vh - 96px));
   border-radius: 24px;
@@ -63,17 +77,33 @@
   box-shadow:
     0 30px 80px rgba(15, 23, 42, 0.24),
     0 8px 20px rgba(14, 116, 144, 0.18);
-  display: none;
+  display: flex;
   flex-direction: column;
   backdrop-filter: blur(16px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.97);
+  transform-origin: bottom right;
+  transition:
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s linear 220ms;
 }
 
 .pcw-panel.is-open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s linear 0s;
 }
 
 .pcw-header {
-  padding: 18px 18px 14px;
+  padding: 12px 14px 10px;
   background:
     linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(12, 74, 110, 0.96));
   color: #f8fafc;
@@ -93,24 +123,28 @@
 }
 
 .pcw-eyebrow {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 3px;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  opacity: 0.76;
+  opacity: 0.6;
 }
 
 .pcw-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .pcw-subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(241, 245, 249, 0.86);
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(241, 245, 249, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .pcw-close {
@@ -135,11 +169,11 @@
 }
 
 .pcw-body {
-  padding: 16px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 12px;
+  gap: 8px;
   flex: 1;
 }
 
@@ -149,16 +183,19 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   padding-right: 4px;
 }
 
 .pcw-message {
-  max-width: 92%;
-  padding: 12px 14px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.5;
+  max-width: 72%;
+  padding: 4px 9px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.pcw-message-text {
   white-space: pre-wrap;
 }
 
@@ -220,20 +257,36 @@
   animation-delay: 0.3s;
 }
 
-.pcw-starters {
+.pcw-starters-inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  padding: 4px 0 2px;
+  align-self: flex-start;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.pcw-starters-inline.is-hiding {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
 }
 
 .pcw-starter {
-  border: 1px solid rgba(14, 116, 144, 0.18);
-  background: rgba(14, 116, 144, 0.06);
+  border: 1px solid rgba(14, 116, 144, 0.22);
+  background: rgba(14, 116, 144, 0.07);
   color: #0f172a;
   border-radius: 999px;
   font-size: 12px;
-  padding: 8px 12px;
+  padding: 5px 11px;
   cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+  white-space: nowrap;
+}
+
+.pcw-starter:hover {
+  background: rgba(14, 116, 144, 0.13);
+  border-color: rgba(14, 116, 144, 0.35);
 }
 
 .pcw-form {
@@ -257,26 +310,32 @@
 .pcw-input {
   border: 1px solid rgba(148, 163, 184, 0.45);
   background: rgba(255, 255, 255, 0.9);
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  padding: 10px 12px;
   color: #0f172a;
   resize: none;
-  min-height: 52px;
-  max-height: 132px;
-  font-size: 14px;
+  min-height: 44px;
+  max-height: 120px;
+  font-size: 13px;
   line-height: 1.45;
+  transition: border-color 160ms ease;
+}
+
+.pcw-input:focus {
+  border-color: rgba(14, 116, 144, 0.5);
 }
 
 .pcw-send {
   border: 0;
   background: linear-gradient(135deg, #0f172a, #0e7490);
   color: #ffffff;
-  min-width: 88px;
-  height: 52px;
-  border-radius: 16px;
+  min-width: 72px;
+  height: 44px;
+  border-radius: 14px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  transition: opacity 160ms ease;
 }
 
 .pcw-send:disabled,
@@ -297,23 +356,23 @@
   background: rgba(248, 250, 252, 0.95);
   color: #0f172a;
   border-radius: 999px;
-  min-height: 32px;
-  padding: 0 12px;
-  font-size: 12px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .pcw-status {
-  font-size: 12px;
+  font-size: 11px;
   color: #475467;
-  min-height: 18px;
+  min-height: 15px;
 }
 
 .pcw-footnote {
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.4;
-  color: #667085;
+  color: #94a3b8;
 }
 
 @keyframes pcw-pulse {
@@ -339,7 +398,6 @@
   .pcw-panel {
     width: 100%;
     height: min(82vh, 680px);
-    margin-left: auto;
     border-radius: 20px;
   }
 
@@ -349,11 +407,11 @@
   }
 
   .pcw-header {
-    padding: 16px 14px 12px;
+    padding: 10px 12px 8px;
   }
 
   .pcw-body {
-    padding: 12px;
+    padding: 8px 10px 10px;
   }
 
   .pcw-form {
