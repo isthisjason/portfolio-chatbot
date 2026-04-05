@@ -1,6 +1,7 @@
 import { boundaries } from "./boundaries.js";
 import { education } from "./education.js";
 import { experience } from "./experience.js";
+import { maintenance } from "./maintenance.js";
 import { owner } from "./owner.js";
 import { projects } from "./projects.js";
 import { stack } from "./stack.js";
@@ -18,6 +19,14 @@ function compactLinkList(links = []) {
       label: String(link.label).trim(),
       url: String(link.url).trim(),
     }));
+}
+
+function parsePositiveInteger(value, fallback = 30) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
 }
 
 export function getPortfolioData() {
@@ -72,6 +81,11 @@ export function getPortfolioData() {
       restrictedTopics: compactStringList(boundaries.restrictedTopics || []),
       fallbackMessage: String(boundaries.fallbackMessage || "").trim(),
     },
+    maintenance: {
+      updatedAt: String(maintenance.updatedAt || "").trim(),
+      sourceOfTruth: compactStringList(maintenance.sourceOfTruth || []),
+      reviewCadenceDays: parsePositiveInteger(maintenance.reviewCadenceDays, 30),
+    },
   };
 }
 
@@ -100,6 +114,14 @@ export function validatePortfolioData(portfolioData) {
 
   if (!portfolioData.education.length) {
     warnings.push("education is empty");
+  }
+
+  if (!portfolioData.maintenance.updatedAt) {
+    warnings.push("maintenance.updatedAt is empty");
+  }
+
+  if (!portfolioData.maintenance.sourceOfTruth.length) {
+    warnings.push("maintenance.sourceOfTruth has no entries");
   }
 
   return warnings;

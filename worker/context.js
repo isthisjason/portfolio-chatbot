@@ -27,6 +27,7 @@ function buildContextPayload(warnings) {
     projects: portfolioContext.projects.map(formatProject),
     experience: portfolioContext.experience,
     boundaries: portfolioContext.boundaries,
+    maintenance: portfolioContext.maintenance,
     dataQualityWarnings: warnings,
   };
 }

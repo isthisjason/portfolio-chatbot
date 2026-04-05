@@ -12,7 +12,9 @@
     "deploy:worker:production": "wrangler deploy",
     "preview:demo": "python3 -m http.server 4173",
     "test:worker": "node ./scripts/test-worker.mjs",
-    "test:guardrails": "node ./scripts/test-guardrails.mjs"
+    "test:guardrails": "node ./scripts/test-guardrails.mjs",
+    "context:check": "node ./scripts/context-maintenance-check.mjs",
+    "logs:tail": "wrangler tail"
   },
   "devDependencies": {
     "wrangler": "^4.10.0"

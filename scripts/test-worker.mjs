@@ -120,6 +120,28 @@ async function testPayloadValidation() {
   printResult("payload validation", result);
 }
 
+async function testAnalyticsEvent() {
+  const result = await request("/api/events", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      event: "open",
+      metadata: {
+        source: "worker-test",
+        pagePath: "/test",
+        sessionId: "worker-test-session",
+        widgetVersion: "1.0.0",
+      },
+    }),
+  });
+
+  assertWithResult(result.status === 202, "Analytics event should return 202", result);
+  assertWithResult(result.json?.ok === true, "Expected analytics ack payload", result);
+  printResult("analytics event", result);
+}
+
 async function testMissingSecretFallback() {
   const result = await request("/api/chat", {
     method: "POST",
@@ -223,6 +245,7 @@ async function run() {
   await testContentTypeValidation();
   await testInvalidJsonValidation();
   await testPayloadValidation();
+  await testAnalyticsEvent();
 
   if (TEST_MODE === "missing-secret") {
     await testMissingSecretFallback();

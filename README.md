@@ -95,6 +95,9 @@ Global config:
 - `window.PortfolioChatbotConfig.title` (optional)
 - `window.PortfolioChatbotConfig.subtitle` (optional)
 - `window.PortfolioChatbotConfig.starterQuestions` (optional `string[]` or `|`-delimited string)
+- `window.PortfolioChatbotConfig.analyticsEnabled` (optional, default `true`)
+- `window.PortfolioChatbotConfig.source` (optional, default `portfolio-widget`)
+- `window.PortfolioChatbotConfig.turnstileToken` (optional; only needed when Turnstile is required)
 
 Script `data-*` attributes (optional):
 
@@ -102,6 +105,9 @@ Script `data-*` attributes (optional):
 - `data-title`
 - `data-subtitle`
 - `data-starter-questions` (pipe-delimited)
+- `data-analytics-enabled` (`true`/`false`)
+- `data-source`
+- `data-turnstile-token`
 
 Resolution order:
 
@@ -156,6 +162,12 @@ Optional provider secret:
 wrangler secret put ANTHROPIC_API_KEY
 ```
 
+Optional abuse-protection secret:
+
+```bash
+wrangler secret put TURNSTILE_SECRET_KEY
+```
+
 Preview secret setup:
 
 ```bash
@@ -173,7 +185,11 @@ Non-sensitive environment variables live in `wrangler.toml` or local `.env` file
 - `ALLOWED_ORIGINS`
 - `RATE_LIMIT_WINDOW_MS`
 - `RATE_LIMIT_MAX_REQUESTS`
+- `RATE_LIMIT_MIN_INTERVAL_MS`
+- `UNTRUSTED_RATE_LIMIT_MAX_REQUESTS`
 - `DUPLICATE_MESSAGE_THRESHOLD`
+- `ALLOWED_SOURCES`
+- `TURNSTILE_REQUIRED`
 
 Provider notes:
 
@@ -289,19 +305,54 @@ Current protections:
 - message count and message length validation
 - origin allowlist checks
 - per-client in-memory rate limiting using IP, origin, and request source
+- minimum interval protection between requests per client key
 - duplicate-burst detection for repeated user messages
+- trusted source allowlist via `ALLOWED_SOURCES`
+- optional Turnstile verification when `TURNSTILE_REQUIRED=true`
 
 Current defaults:
 
 - `RATE_LIMIT_WINDOW_MS=60000`
 - `RATE_LIMIT_MAX_REQUESTS=12`
+- `RATE_LIMIT_MIN_INTERVAL_MS=1200`
+- `UNTRUSTED_RATE_LIMIT_MAX_REQUESTS=4`
 - `DUPLICATE_MESSAGE_THRESHOLD=3`
+- `ALLOWED_SOURCES=portfolio-widget,worker-test`
+- `TURNSTILE_REQUIRED=false`
 
 Notes:
 
 - this rate limiting is isolate-local, so it is intentionally lightweight rather than durable
 - it is good enough as a first pass for recruiter-facing widget traffic
 - if traffic grows, the next step is durable rate limiting with Cloudflare KV, Durable Objects, or another shared store
+
+## Analytics and observability
+
+The Worker now supports lightweight widget event tracking through `POST /api/events`.
+
+Tracked widget events:
+
+- `open`
+- `send`
+- `fallback`
+- `refusal`
+- `error`
+
+Event payloads are metadata-only (no raw chat text) and are logged as structured Worker logs.
+
+Useful commands:
+
+```bash
+npm run logs:tail
+```
+
+Look for:
+
+- `analytics.widget_event`
+- `chat.response_sent`
+- `chat.guardrail_fallback`
+- `guardrail.sensitive_question_refused`
+- `provider.request_failed`
 
 ## Logging
 
@@ -311,8 +362,24 @@ Current logging behavior:
 
 - logs request IDs with CORS blocks, abuse blocks, provider config issues, and provider failures
 - logs provider name, model, status code, and failure category when available
+- logs chat duration and source metadata with `chat.response_sent`
+- logs widget usage-quality signals from `/api/events`
 - avoids logging raw chat messages, request bodies, or API keys
 - keeps fallback behavior user-safe even when internal errors are logged
+
+## Prompt/context maintenance workflow
+
+To keep grounding accurate over time:
+
+1. Update `data/portfolio/*` when your resume, projects, or stack changes.
+2. Update `data/portfolio/maintenance.js` `updatedAt` with the current date (`YYYY-MM-DD`).
+3. Run:
+   `npm run context:check`
+4. Run:
+   `npm run test:guardrails`
+5. If both pass, deploy normally.
+
+This keeps context freshness explicit, review cadence visible, and grounding regressions easier to catch before release.
 
 ## Launch Guardrails
 

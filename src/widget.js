@@ -8,6 +8,9 @@ const DEFAULT_CONFIG = {
   title: "Ask Jason",
   subtitle: "Recruiter-focused answers grounded in public portfolio and resume details.",
   apiBaseUrl: "",
+  analyticsEnabled: true,
+  source: "portfolio-widget",
+  turnstileToken: "",
   starterQuestions: [
     "What kind of engineer is Jason?",
     "Which project best demonstrates full-stack ownership?",
@@ -80,13 +83,63 @@ function normalizeString(value, fallback = "") {
   return normalized || fallback;
 }
 
+function normalizeBoolean(value, fallback = true) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["0", "false", "no", "off"].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
+}
+
 function normalizeConfig(config = {}) {
   return {
     title: normalizeString(config.title, DEFAULT_CONFIG.title),
     subtitle: normalizeString(config.subtitle, DEFAULT_CONFIG.subtitle),
     apiBaseUrl: normalizeString(config.apiBaseUrl).replace(/\/$/, ""),
+    analyticsEnabled: normalizeBoolean(
+      config.analyticsEnabled,
+      DEFAULT_CONFIG.analyticsEnabled,
+    ),
+    source: normalizeString(config.source, DEFAULT_CONFIG.source),
+    turnstileToken: normalizeString(config.turnstileToken),
     starterQuestions: normalizeStarterQuestions(config.starterQuestions),
   };
+}
+
+function trackEvent(event, metadata = {}) {
+  if (!state.config.apiBaseUrl || !state.config.analyticsEnabled) {
+    return;
+  }
+
+  const payload = {
+    event,
+    metadata: {
+      source: state.config.source,
+      pagePath: window.location.pathname,
+      sessionId: getSessionId(),
+      widgetVersion: EMBED_CONTRACT_VERSION,
+      ...metadata,
+    },
+  };
+
+  fetch(`${state.config.apiBaseUrl}/api/events`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function autoResizeTextarea(textarea) {
@@ -141,12 +194,16 @@ function setPending(nextPending) {
 }
 
 function setOpen(nextOpen) {
+  const wasOpen = state.open;
   state.open = nextOpen;
   state.elements.panel.classList.toggle("is-open", nextOpen);
   state.elements.launcher.setAttribute("aria-expanded", String(nextOpen));
   state.elements.retry.disabled = state.pending || !state.lastUserMessage;
 
   if (nextOpen) {
+    if (!wasOpen) {
+      trackEvent("open");
+    }
     state.previousFocusedElement = document.activeElement;
     state.elements.input.focus();
   } else {
@@ -228,6 +285,7 @@ async function submitMessage(content) {
   }
 
   state.lastUserMessage = message;
+  trackEvent("send", { messageLength: message.length });
 
   if (!state.config.apiBaseUrl) {
     state.conversation.push({
@@ -258,8 +316,9 @@ async function submitMessage(content) {
       },
       body: JSON.stringify({
         messages: state.conversation,
+        turnstileToken: state.config.turnstileToken || undefined,
         metadata: {
-          source: "portfolio-widget",
+          source: state.config.source,
           pagePath: window.location.pathname,
           sessionId: getSessionId(),
         },
@@ -269,6 +328,9 @@ async function submitMessage(content) {
     const payload = await response.json();
 
     if (!response.ok) {
+      trackEvent("error", {
+        statusCode: response.status,
+      });
       throw new Error(
         payload?.error?.message || `Request failed with status ${response.status}`,
       );
@@ -276,6 +338,15 @@ async function submitMessage(content) {
     const reply = payload?.reply?.trim();
     const isFallback = payload?.meta?.fallback === true;
     const fallbackReason = payload?.meta?.fallbackReason;
+    const refusal = payload?.meta?.refusal === true;
+    const refusalReason = payload?.meta?.refusalReason;
+
+    if (isFallback) {
+      trackEvent("fallback", { fallbackReason });
+    }
+    if (refusal) {
+      trackEvent("refusal", { refusalReason });
+    }
 
     state.conversation.push({
       role: "assistant",
@@ -312,6 +383,9 @@ async function submitMessage(content) {
     });
     renderMessages();
     setStatus("Connection issue. Retry is available.");
+    trackEvent("error", {
+      statusCode: 0,
+    });
   } finally {
     setPending(false);
   }
@@ -483,6 +557,20 @@ function resolveConfig(overrides = {}) {
       globalConfig.starterQuestions ||
       scriptConfig.starterQuestions ||
       DEFAULT_CONFIG.starterQuestions,
+    analyticsEnabled:
+      overrides.analyticsEnabled ??
+      globalConfig.analyticsEnabled ??
+      DEFAULT_CONFIG.analyticsEnabled,
+    source:
+      overrides.source ||
+      globalConfig.source ||
+      scriptConfig.source ||
+      DEFAULT_CONFIG.source,
+    turnstileToken:
+      overrides.turnstileToken ||
+      globalConfig.turnstileToken ||
+      scriptConfig.turnstileToken ||
+      DEFAULT_CONFIG.turnstileToken,
   };
 
   return normalizeConfig(mergedConfig);

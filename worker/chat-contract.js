@@ -4,6 +4,7 @@ export const MAX_CHAT_MESSAGES = 10;
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_METADATA_LENGTH = 200;
 export const MAX_REQUEST_BODY_LENGTH = 25000;
+export const MAX_TURNSTILE_TOKEN_LENGTH = 2048;
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,12 +70,13 @@ export function parseChatRequest(body) {
     };
   }
 
-  if (!hasOnlyAllowedKeys(body, ["messages", "metadata"])) {
+  if (!hasOnlyAllowedKeys(body, ["messages", "metadata", "turnstileToken"])) {
     return {
       ok: false,
       error: {
         code: "unknown_request_fields",
-        message: "Only 'messages' and optional 'metadata' are allowed in the request body.",
+        message:
+          "Only 'messages', optional 'metadata', and optional 'turnstileToken' are allowed in the request body.",
       },
     };
   }
@@ -215,11 +217,41 @@ export function parseChatRequest(body) {
       }
     : {};
 
+  if (
+    body.turnstileToken !== undefined &&
+    typeof body.turnstileToken !== "string"
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_turnstile_token",
+        message: "turnstileToken must be a string when provided.",
+      },
+    };
+  }
+
+  if (
+    typeof body.turnstileToken === "string" &&
+    body.turnstileToken.length > MAX_TURNSTILE_TOKEN_LENGTH
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "turnstile_token_too_long",
+        message: `turnstileToken must be ${MAX_TURNSTILE_TOKEN_LENGTH} characters or fewer.`,
+      },
+    };
+  }
+
   return {
     ok: true,
     data: {
       messages: normalizedMessages,
       metadata,
+      turnstileToken:
+        typeof body.turnstileToken === "string"
+          ? body.turnstileToken.trim()
+          : "",
     },
   };
 }

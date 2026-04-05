@@ -11,6 +11,11 @@ import {
   parseChatRequest,
 } from "./chat-contract.js";
 import {
+  EVENTS_API_PATH,
+  MAX_EVENT_BODY_LENGTH,
+  parseAnalyticsEvent,
+} from "./analytics-contract.js";
+import {
   generateChatReply,
   validateProviderConfig,
 } from "./providers/index.js";
@@ -23,6 +28,7 @@ import {
   enforceResponseGuardrails,
   isSensitivePersonalQuestion,
 } from "./guardrails.js";
+import { verifyTurnstileToken } from "./turnstile.js";
 
 function json(data, init = {}, corsHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -66,6 +72,21 @@ function buildFallbackResponse({
   );
 }
 
+function analyticsAcceptedResponse({ requestId }, corsHeaders) {
+  return json(
+    {
+      ok: true,
+      meta: {
+        requestId,
+      },
+    },
+    {
+      status: 202,
+    },
+    corsHeaders,
+  );
+}
+
 function isUnderGroundedReply(reply) {
   if (!reply || typeof reply !== "string") {
     return true;
@@ -100,6 +121,7 @@ export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     const requestId = crypto.randomUUID();
+    const startedAt = Date.now();
     const cors = resolveCors(request, env);
 
     if (request.method === "OPTIONS") {
@@ -130,6 +152,7 @@ export default {
           service: "portfolio-chatbot-worker",
           routes: {
             chat: CHAT_API_PATH,
+            analytics: EVENTS_API_PATH,
             health: "/health",
           },
         },
@@ -145,7 +168,7 @@ export default {
       });
     }
 
-    if (pathname !== CHAT_API_PATH) {
+    if (pathname !== CHAT_API_PATH && pathname !== EVENTS_API_PATH) {
       return json(
         buildChatError({
           code: "not_found",
@@ -206,6 +229,108 @@ export default {
         { status: 413 },
         cors.headers,
       );
+    }
+
+    if (pathname === EVENTS_API_PATH) {
+      if (contentLength !== null && contentLength > MAX_EVENT_BODY_LENGTH) {
+        return json(
+          buildChatError({
+            code: "event_request_too_large",
+            message: `Analytics request body must be ${MAX_EVENT_BODY_LENGTH} bytes or fewer.`,
+            requestId,
+          }),
+          { status: 413 },
+          cors.headers,
+        );
+      }
+
+      try {
+        const rawBody = await request.text();
+        if (!rawBody.trim()) {
+          return json(
+            buildChatError({
+              code: "empty_body",
+              message: "Request body must not be empty.",
+              requestId,
+            }),
+            { status: 400 },
+            cors.headers,
+          );
+        }
+
+        if (rawBody.length > MAX_EVENT_BODY_LENGTH) {
+          return json(
+            buildChatError({
+              code: "event_request_too_large",
+              message: `Analytics request body must be ${MAX_EVENT_BODY_LENGTH} bytes or fewer.`,
+              requestId,
+            }),
+            { status: 413 },
+            cors.headers,
+          );
+        }
+
+        let payload;
+        try {
+          payload = JSON.parse(rawBody);
+        } catch {
+          return json(
+            buildChatError({
+              code: "invalid_json",
+              message: "Request body must be valid JSON.",
+              requestId,
+            }),
+            { status: 400 },
+            cors.headers,
+          );
+        }
+
+        const parsedEvent = parseAnalyticsEvent(payload);
+        if (!parsedEvent.ok) {
+          return json(
+            buildChatError({
+              ...parsedEvent.error,
+              requestId,
+            }),
+            { status: 400 },
+            cors.headers,
+          );
+        }
+
+        const { event, metadata } = parsedEvent.data;
+        const logDetails = {
+          requestId,
+          event,
+          source: metadata.source,
+          pagePath: metadata.pagePath,
+          sessionId: metadata.sessionId,
+          widgetVersion: metadata.widgetVersion,
+          messageLength: metadata.messageLength,
+          fallbackReason: metadata.fallbackReason,
+          refusalReason: metadata.refusalReason,
+          statusCode: metadata.statusCode,
+          origin: cors.origin,
+        };
+
+        if (event === "error" || event === "fallback") {
+          logWarn("analytics.widget_event", logDetails, env);
+        } else {
+          logInfo("analytics.widget_event", logDetails, env);
+        }
+
+        return analyticsAcceptedResponse({ requestId }, cors.headers);
+      } catch (error) {
+        logError(
+          "analytics.unexpected_failure",
+          {
+            requestId,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+          env,
+        );
+        return analyticsAcceptedResponse({ requestId }, cors.headers);
+      }
     }
 
     const providerConfig = validateProviderConfig(env);
@@ -281,25 +406,32 @@ export default {
         );
       }
 
-      const { messages } = parsedRequest.data;
+      const { messages, turnstileToken } = parsedRequest.data;
       const latestUserMessage = messages.at(-1)?.content || "";
 
-      if (isSensitivePersonalQuestion(latestUserMessage)) {
+      const turnstileResult = await verifyTurnstileToken({
+        request,
+        token: turnstileToken,
+        env,
+      });
+      if (!turnstileResult.ok) {
         logWarn(
-          "guardrail.sensitive_question_refused",
-          { requestId },
+          "abuse.turnstile_blocked",
+          {
+            requestId,
+            code: turnstileResult.code,
+            origin: cors.origin,
+          },
           env,
         );
         return json(
-          buildChatSuccess({
-            reply: buildSensitiveRefusalReply(),
-            model: "guardrail",
-            grounded: true,
+          buildChatError({
+            code: turnstileResult.code,
+            message: turnstileResult.message,
+            details: turnstileResult.details,
             requestId,
-            refusal: true,
-            refusalReason: "sensitive_personal_question",
           }),
-          {},
+          { status: 403 },
           cors.headers,
         );
       }
@@ -333,6 +465,26 @@ export default {
               "retry-after": String(abuseCheck.retryAfterSeconds),
             },
           },
+          cors.headers,
+        );
+      }
+
+      if (isSensitivePersonalQuestion(latestUserMessage)) {
+        logWarn(
+          "guardrail.sensitive_question_refused",
+          { requestId },
+          env,
+        );
+        return json(
+          buildChatSuccess({
+            reply: buildSensitiveRefusalReply(),
+            model: "guardrail",
+            grounded: true,
+            requestId,
+            refusal: true,
+            refusalReason: "sensitive_personal_question",
+          }),
+          {},
           cors.headers,
         );
       }
@@ -396,6 +548,20 @@ export default {
             "under_grounded_reply",
         }, cors.headers);
       }
+
+      logInfo(
+        "chat.response_sent",
+        {
+          requestId,
+          provider: result.provider,
+          model: result.model,
+          durationMs: Date.now() - startedAt,
+          fallback: false,
+          refusal: false,
+          source: parsedRequest.data.metadata?.source,
+        },
+        env,
+      );
 
       return json(
         buildChatSuccess({
