@@ -153,19 +153,19 @@ Use Worker secrets for provider API keys. Do not commit secrets to the repo.
 Production secret setup:
 
 ```bash
-wrangler secret put OPENAI_API_KEY
+wrangler secret put OPENAI_API_KEY --env=""
 ```
 
 Optional provider secret:
 
 ```bash
-wrangler secret put ANTHROPIC_API_KEY
+wrangler secret put ANTHROPIC_API_KEY --env=""
 ```
 
 Optional abuse-protection secret:
 
 ```bash
-wrangler secret put TURNSTILE_SECRET_KEY
+wrangler secret put TURNSTILE_SECRET_KEY --env=""
 ```
 
 Preview secret setup:
@@ -174,6 +174,11 @@ Preview secret setup:
 wrangler secret put OPENAI_API_KEY --env preview
 wrangler secret put ANTHROPIC_API_KEY --env preview
 ```
+
+Secret hygiene:
+
+- Never paste raw API keys directly into command arguments.
+- Always run `wrangler secret put ...` and paste the key only at Wrangler's hidden prompt.
 
 Non-sensitive environment variables live in `wrangler.toml` or local `.env` files:
 
@@ -242,8 +247,8 @@ https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev
 
 Before deploying:
 
-1. Set production secrets with `wrangler secret put`.
-2. Set preview secrets with `wrangler secret put --env preview`.
+1. Set production secrets with explicit env targeting (for example `wrangler secret put OPENAI_API_KEY --env=""`).
+2. Set preview secrets with `wrangler secret put ... --env preview`.
 3. Replace placeholder origins in `wrangler.toml` with your real portfolio origins.
 4. Keep `window.PortfolioChatbotConfig.apiBaseUrl` in the portfolio pointed at the correct Worker base URL.
 

@@ -116,6 +116,32 @@ function normalizeConfig(config = {}) {
   };
 }
 
+function parseJsonResponse(text) {
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function buildRequestMessages(conversation) {
+  return conversation
+    .map((message) => ({
+      role: message?.role,
+      content: message?.content,
+    }))
+    .filter(
+      (message) =>
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0,
+    );
+}
+
 function trackEvent(event, metadata = {}) {
   if (!state.config.apiBaseUrl || !state.config.analyticsEnabled) {
     return;
@@ -315,7 +341,7 @@ async function submitMessage(content) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        messages: state.conversation,
+        messages: buildRequestMessages(state.conversation),
         turnstileToken: state.config.turnstileToken || undefined,
         metadata: {
           source: state.config.source,
@@ -325,14 +351,18 @@ async function submitMessage(content) {
       }),
     });
 
-    const payload = await response.json();
+    const rawPayload = await response.text();
+    const payload = parseJsonResponse(rawPayload);
 
     if (!response.ok) {
       trackEvent("error", {
         statusCode: response.status,
       });
+      const errorCode = payload?.error?.code;
+      const errorMessage =
+        payload?.error?.message || `Request failed with status ${response.status}`;
       throw new Error(
-        payload?.error?.message || `Request failed with status ${response.status}`,
+        `${errorCode ? `[${errorCode}] ` : ""}${errorMessage}`,
       );
     }
     const reply = payload?.reply?.trim();
@@ -374,12 +404,14 @@ async function submitMessage(content) {
     console.error("[portfolio-chatbot] request failed", error);
     state.hasConnectionIssue = true;
     state.reconnectNotified = false;
+    const detail = String(error?.message || "").trim().slice(0, 180);
     state.conversation.push({
       role: "assistant",
       kind: "error",
       note: "Network or API error",
-      content:
-        "I couldn't reach the portfolio assistant just now. You can retry the last question or wait a moment and try again.",
+      content: detail
+        ? `I couldn't complete that request. ${detail}`
+        : "I couldn't reach the portfolio assistant just now. You can retry the last question or wait a moment and try again.",
     });
     renderMessages();
     setStatus("Connection issue. Retry is available.");
