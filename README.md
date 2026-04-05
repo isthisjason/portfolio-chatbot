@@ -410,6 +410,23 @@ What to verify in the widget:
 - fallback replies are visually labeled when the Worker returns a safe fallback
 - network or API failures show a calm error state
 - the widget status line shows whether it is connected to the local Worker
+- clear-chat and retry controls work as expected
+- keyboard flow supports launcher focus, `Escape` close, and tab navigation inside the panel
+
+## Widget UX and Accessibility
+
+Recent recruiter-flow polish includes:
+
+- refined welcome copy and starter prompts for concise professional framing
+- explicit loading indicator while the assistant is thinking
+- better fallback/error notes and reconnect status messaging
+- `Clear` and `Retry Last` quality-of-life controls
+- dialog semantics and keyboard improvements:
+  - `role="dialog"` panel
+  - launcher `aria-haspopup`/`aria-controls`
+  - input label and status live region
+  - `Escape` to close
+  - focus trap while panel is open
 
 ## API contract
 

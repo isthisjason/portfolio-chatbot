@@ -6,12 +6,12 @@ const WIDGET_HOST_ID = "portfolio-chatbot-widget";
 
 const DEFAULT_CONFIG = {
   title: "Ask Jason",
-  subtitle: "A grounded portfolio assistant for recruiters and hiring teams.",
+  subtitle: "Recruiter-focused answers grounded in public portfolio and resume details.",
   apiBaseUrl: "",
   starterQuestions: [
-    "What projects best show security and production readiness?",
     "What kind of engineer is Jason?",
-    "Which project best reflects full-stack experience?",
+    "Which project best demonstrates full-stack ownership?",
+    "What shows his security and production readiness?",
   ],
 };
 
@@ -24,6 +24,10 @@ const state = {
   mounted: false,
   open: false,
   pending: false,
+  hasConnectionIssue: false,
+  reconnectNotified: false,
+  lastUserMessage: "",
+  previousFocusedElement: null,
   elements: {},
   config: { ...DEFAULT_CONFIG },
   conversation: [],
@@ -92,8 +96,7 @@ function autoResizeTextarea(textarea) {
 
 function renderMessages() {
   const { messages } = state.elements;
-
-  messages.innerHTML = state.conversation
+  const conversationHtml = state.conversation
     .map(
       (message) => `
         <div class="pcw-message ${message.role} ${message.kind || "default"}">
@@ -108,6 +111,18 @@ function renderMessages() {
     )
     .join("");
 
+  const pendingHtml = state.pending
+    ? `
+      <div class="pcw-message assistant typing" aria-live="polite" aria-label="Assistant is thinking">
+        <span class="pcw-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </div>
+    `
+    : "";
+
+  messages.innerHTML = `${conversationHtml}${pendingHtml}`;
+
   messages.scrollTop = messages.scrollHeight;
 }
 
@@ -119,17 +134,90 @@ function setPending(nextPending) {
   state.pending = nextPending;
   state.elements.send.disabled = nextPending;
   state.elements.input.disabled = nextPending;
+  state.elements.clear.disabled = nextPending;
+  state.elements.retry.disabled = nextPending || !state.lastUserMessage;
   state.elements.send.textContent = nextPending ? "Sending..." : "Send";
+  renderMessages();
 }
 
 function setOpen(nextOpen) {
   state.open = nextOpen;
   state.elements.panel.classList.toggle("is-open", nextOpen);
   state.elements.launcher.setAttribute("aria-expanded", String(nextOpen));
+  state.elements.retry.disabled = state.pending || !state.lastUserMessage;
 
   if (nextOpen) {
+    state.previousFocusedElement = document.activeElement;
     state.elements.input.focus();
+  } else {
+    const focusTarget =
+      state.previousFocusedElement &&
+      state.previousFocusedElement instanceof HTMLElement
+        ? state.previousFocusedElement
+        : state.elements.launcher;
+    focusTarget.focus();
   }
+}
+
+function trapFocus(event) {
+  if (!state.open || event.key !== "Tab") {
+    return;
+  }
+
+  const focusable = Array.from(
+    state.elements.panel.querySelectorAll(
+      'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    ),
+  );
+
+  if (!focusable.length) {
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function onDocumentKeydown(event) {
+  if (event.key === "Escape" && state.open) {
+    event.preventDefault();
+    setOpen(false);
+    return;
+  }
+
+  trapFocus(event);
+}
+
+function clearConversation() {
+  state.conversation = [
+    {
+      role: "assistant",
+      kind: "default",
+      content:
+        "Ask about experience, projects, stack, or strengths. Replies stay concise and grounded in documented portfolio context.",
+    },
+  ];
+  state.lastUserMessage = "";
+  setStatus("Conversation cleared");
+  setPending(false);
+  renderMessages();
+}
+
+async function retryLastMessage() {
+  if (!state.lastUserMessage || state.pending) {
+    return;
+  }
+
+  await submitMessage(state.lastUserMessage);
 }
 
 async function submitMessage(content) {
@@ -138,6 +226,8 @@ async function submitMessage(content) {
   if (!message) {
     return;
   }
+
+  state.lastUserMessage = message;
 
   if (!state.config.apiBaseUrl) {
     state.conversation.push({
@@ -191,25 +281,37 @@ async function submitMessage(content) {
       role: "assistant",
       kind: isFallback ? "fallback" : "default",
       note: isFallback
-        ? `Fallback response${fallbackReason ? `: ${fallbackReason.replaceAll("_", " ")}` : ""}`
+        ? `Safe fallback${fallbackReason ? `: ${fallbackReason.replaceAll("_", " ")}` : ""}`
         : "",
       content:
         reply ||
         "I couldn't find a grounded answer in the portfolio context yet.",
     });
     renderMessages();
-    setStatus(isFallback ? "Showing safe fallback response" : "Connected to local Worker");
+    if (state.hasConnectionIssue) {
+      state.hasConnectionIssue = false;
+      state.reconnectNotified = true;
+      setStatus("Reconnected. Responses are live again.");
+    } else {
+      setStatus(
+        isFallback
+          ? "Showing safe fallback response"
+          : "Connected and responding",
+      );
+    }
   } catch (error) {
     console.error("[portfolio-chatbot] request failed", error);
+    state.hasConnectionIssue = true;
+    state.reconnectNotified = false;
     state.conversation.push({
       role: "assistant",
       kind: "error",
       note: "Network or API error",
       content:
-        "I'm having trouble reaching the portfolio assistant right now. Please try again in a moment.",
+        "I couldn't reach the portfolio assistant just now. You can retry the last question or wait a moment and try again.",
     });
     renderMessages();
-    setStatus("Connection issue");
+    setStatus("Connection issue. Retry is available.");
   } finally {
     setPending(false);
   }
@@ -219,6 +321,8 @@ function attachEventHandlers() {
   const {
     launcher,
     close,
+    clear,
+    retry,
     form,
     input,
     starters,
@@ -226,6 +330,8 @@ function attachEventHandlers() {
 
   launcher.addEventListener("click", () => setOpen(!state.open));
   close.addEventListener("click", () => setOpen(false));
+  clear.addEventListener("click", clearConversation);
+  retry.addEventListener("click", retryLastMessage);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -253,6 +359,8 @@ function attachEventHandlers() {
     }
     await submitMessage(value);
   });
+
+  document.addEventListener("keydown", onDocumentKeydown);
 }
 
 function createMarkup(config) {
@@ -269,7 +377,14 @@ function createMarkup(config) {
   return `
     <style>${STYLE_TEXT}</style>
     <div class="pcw-root">
-      <div class="pcw-panel" aria-live="polite">
+      <div
+        id="pcw-panel"
+        class="pcw-panel"
+        aria-live="polite"
+        role="dialog"
+        aria-modal="false"
+        aria-label="${escapeHtml(config.title)} chat panel"
+      >
         <header class="pcw-header">
           <div class="pcw-header-row">
             <div>
@@ -277,33 +392,49 @@ function createMarkup(config) {
               <h2 class="pcw-title">${escapeHtml(config.title)}</h2>
               <p class="pcw-subtitle">${escapeHtml(config.subtitle)}</p>
             </div>
-            <button class="pcw-close" type="button" aria-label="Close chat">
-              ×
-            </button>
+            <div class="pcw-header-actions">
+              <button class="pcw-clear" type="button" aria-label="Clear chat">
+                Clear
+              </button>
+              <button class="pcw-close" type="button" aria-label="Close chat">
+                ×
+              </button>
+            </div>
           </div>
         </header>
 
         <div class="pcw-body">
           <div class="pcw-messages">
             <div class="pcw-message assistant">
-              Ask about experience, projects, strengths, or stack. I'll stay grounded in the portfolio context and say when something isn't documented.
+              Ask about experience, projects, stack, or strengths. Replies stay concise and grounded in documented portfolio context.
             </div>
           </div>
 
           <div class="pcw-starters">${starterButtons}</div>
 
           <form class="pcw-form">
+            <label class="pcw-visually-hidden" for="pcw-input">
+              Ask a question
+            </label>
             <textarea
+              id="pcw-input"
               class="pcw-input"
               rows="1"
-              placeholder="Ask a question about Jason's work..."
+              placeholder="Ask a recruiter-style question..."
+              aria-label="Ask a question about Jason's experience"
             ></textarea>
             <button class="pcw-send" type="submit">Send</button>
           </form>
 
-          <div class="pcw-status" role="status"></div>
+          <div class="pcw-controls">
+            <button class="pcw-retry" type="button" aria-label="Retry last question">
+              Retry Last
+            </button>
+          </div>
+
+          <div class="pcw-status" role="status" aria-live="polite"></div>
           <div class="pcw-footnote">
-            Recruiter-facing answers are concise by design and avoid unsupported claims.
+            Recruiter-facing responses stay concise, grounded, and explicit when context is incomplete.
           </div>
         </div>
       </div>
@@ -312,6 +443,8 @@ function createMarkup(config) {
         class="pcw-launcher"
         type="button"
         aria-label="Open portfolio chat"
+        aria-haspopup="dialog"
+        aria-controls="pcw-panel"
         aria-expanded="false"
       >
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -375,6 +508,8 @@ function mountWidget(overrides = {}) {
     panel: shadowRoot.querySelector(".pcw-panel"),
     launcher: shadowRoot.querySelector(".pcw-launcher"),
     close: shadowRoot.querySelector(".pcw-close"),
+    clear: shadowRoot.querySelector(".pcw-clear"),
+    retry: shadowRoot.querySelector(".pcw-retry"),
     form: shadowRoot.querySelector(".pcw-form"),
     input: shadowRoot.querySelector(".pcw-input"),
     send: shadowRoot.querySelector(".pcw-send"),
@@ -385,6 +520,7 @@ function mountWidget(overrides = {}) {
 
   attachEventHandlers();
   autoResizeTextarea(state.elements.input);
+  setPending(false);
   setStatus(
     state.config.apiBaseUrl
       ? `Ready for ${state.config.apiBaseUrl}/api/chat`
@@ -398,6 +534,7 @@ function unmountWidget() {
     return;
   }
 
+  document.removeEventListener("keydown", onDocumentKeydown);
   state.elements.host?.remove();
   state.mounted = false;
   state.open = false;
