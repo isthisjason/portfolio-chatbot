@@ -8,6 +8,14 @@ function assert(condition, message) {
   }
 }
 
+function assertWithResult(condition, message, result) {
+  if (!condition) {
+    throw new Error(
+      `${message}\nstatus=${result.status}\nbody=${result.text}`,
+    );
+  }
+}
+
 async function request(path, init = {}) {
   const headers = new Headers(init.headers || {});
   if (ORIGIN && !headers.has("origin")) {
@@ -51,8 +59,12 @@ async function testMethodValidation() {
     method: "GET",
   });
 
-  assert(result.status === 405, "GET /api/chat should return 405");
-  assert(result.json?.error?.code === "method_not_allowed", "Expected method_not_allowed");
+  assertWithResult(result.status === 405, "GET /api/chat should return 405", result);
+  assertWithResult(
+    result.json?.error?.code === "method_not_allowed",
+    "Expected method_not_allowed",
+    result,
+  );
   printResult("method validation", result);
 }
 
@@ -65,10 +77,11 @@ async function testContentTypeValidation() {
     body: "hello",
   });
 
-  assert(result.status === 415, "Invalid content type should return 415");
-  assert(
+  assertWithResult(result.status === 415, "Invalid content type should return 415", result);
+  assertWithResult(
     result.json?.error?.code === "unsupported_content_type",
     "Expected unsupported_content_type",
+    result,
   );
   printResult("content-type validation", result);
 }
@@ -82,8 +95,8 @@ async function testInvalidJsonValidation() {
     body: "{bad json",
   });
 
-  assert(result.status === 400, "Invalid JSON should return 400");
-  assert(result.json?.error?.code === "invalid_json", "Expected invalid_json");
+  assertWithResult(result.status === 400, "Invalid JSON should return 400", result);
+  assertWithResult(result.json?.error?.code === "invalid_json", "Expected invalid_json", result);
   printResult("invalid JSON validation", result);
 }
 
@@ -98,8 +111,12 @@ async function testPayloadValidation() {
     }),
   });
 
-  assert(result.status === 400, "Empty messages should return 400");
-  assert(result.json?.error?.code === "invalid_messages", "Expected invalid_messages");
+  assertWithResult(result.status === 400, "Empty messages should return 400", result);
+  assertWithResult(
+    result.json?.error?.code === "invalid_messages",
+    "Expected invalid_messages",
+    result,
+  );
   printResult("payload validation", result);
 }
 
@@ -124,11 +141,16 @@ async function testMissingSecretFallback() {
     }),
   });
 
-  assert(result.status === 200, "Missing secret path should return 200 fallback response");
-  assert(result.json?.meta?.fallback === true, "Expected fallback response");
-  assert(
+  assertWithResult(
+    result.status === 200,
+    "Missing secret path should return 200 fallback response",
+    result,
+  );
+  assertWithResult(result.json?.meta?.fallback === true, "Expected fallback response", result);
+  assertWithResult(
     result.json?.meta?.fallbackReason === "missing_provider_secret",
     "Expected missing_provider_secret fallback",
+    result,
   );
   printResult("missing secret fallback", result);
 }
@@ -152,11 +174,16 @@ async function testProviderFailureFallback() {
     }),
   });
 
-  assert(result.status === 200, "Provider failure path should return 200 fallback response");
-  assert(result.json?.meta?.fallback === true, "Expected fallback response");
-  assert(
+  assertWithResult(
+    result.status === 200,
+    "Provider failure path should return 200 fallback response",
+    result,
+  );
+  assertWithResult(result.json?.meta?.fallback === true, "Expected fallback response", result);
+  assertWithResult(
     result.json?.meta?.fallbackReason === "provider_failure",
     "Expected provider_failure fallback",
+    result,
   );
   printResult("provider failure fallback", result);
 }
@@ -182,10 +209,10 @@ async function testLiveSuccess() {
     }),
   });
 
-  assert(result.status === 200, "Live provider request should return 200");
-  assert(result.json?.reply, "Expected a reply string");
-  assert(result.json?.meta?.fallback === false, "Expected non-fallback success");
-  assert(result.json?.meta?.grounded === true, "Expected grounded success");
+  assertWithResult(result.status === 200, "Live provider request should return 200", result);
+  assertWithResult(result.json?.reply, "Expected a reply string", result);
+  assertWithResult(result.json?.meta?.fallback === false, "Expected non-fallback success", result);
+  assertWithResult(result.json?.meta?.grounded === true, "Expected grounded success", result);
   printResult("live success", result);
 }
 

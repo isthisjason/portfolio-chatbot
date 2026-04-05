@@ -123,6 +123,28 @@ export default {
       });
     }
 
+    if (pathname === "/" || pathname === "/health") {
+      return json(
+        {
+          ok: true,
+          service: "portfolio-chatbot-worker",
+          routes: {
+            chat: CHAT_API_PATH,
+            health: "/health",
+          },
+        },
+        {},
+        cors.headers,
+      );
+    }
+
+    if (pathname === "/favicon.ico") {
+      return new Response(null, {
+        status: 204,
+        headers: cors.headers,
+      });
+    }
+
     if (pathname !== CHAT_API_PATH) {
       return json(
         buildChatError({
@@ -396,6 +418,7 @@ export default {
             statusCode: error.statusCode,
             category: error.category,
             retryable: error.retryable,
+            providerDetail: error.providerDetail,
           },
           env,
         );

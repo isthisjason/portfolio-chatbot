@@ -6,5 +6,6 @@ export class ProviderError extends Error {
     this.statusCode = options.statusCode;
     this.category = options.category || "provider_failure";
     this.retryable = options.retryable ?? true;
+    this.providerDetail = options.providerDetail;
   }
 }

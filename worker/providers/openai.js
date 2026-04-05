@@ -13,6 +13,13 @@ function extractOpenAIReply(payload) {
   );
 }
 
+function toInputMessage(message) {
+  return {
+    role: message.role,
+    content: message.content,
+  };
+}
+
 export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
   const runtimeConfig = getRuntimeConfig(env);
   const secrets = getProviderSecrets(env);
@@ -30,29 +37,20 @@ export async function generateOpenAIChatReply({ messages, systemPrompt, env }) {
     },
     body: JSON.stringify({
       model,
-      input: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        ...messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
-      ],
-      text: {
-        verbosity: "low",
-      },
+      instructions: systemPrompt,
+      input: messages.map(toInputMessage),
       max_output_tokens: runtimeConfig.maxOutputTokens,
     }),
   });
 
   if (!response.ok) {
+    const providerDetail = (await response.text()).slice(0, 600);
     throw new ProviderError("OpenAI request failed.", {
       provider: "openai",
       statusCode: response.status,
       category: response.status >= 500 ? "provider_upstream_error" : "provider_request_rejected",
       retryable: response.status >= 500 || response.status === 429,
+      providerDetail,
     });
   }
 
