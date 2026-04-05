@@ -1,0 +1,32 @@
+<!-- Production embed -->
+<script>
+  window.PortfolioChatbotConfig = {
+    apiBaseUrl: "https://chatbot-assistant-api.<your-cloudflare-subdomain>.workers.dev",
+    title: "Ask Jason",
+    subtitle: "Ask about experience, projects, strengths, and stack.",
+    starterQuestions: [
+      "What projects best show security and production readiness?",
+      "What kind of engineer is Jason?",
+      "Which project best reflects full-stack experience?"
+    ]
+  };
+</script>
+<script
+  src="https://your-widget-cdn.example.com/widget.js"
+  data-api-base-url="https://chatbot-assistant-api.<your-cloudflare-subdomain>.workers.dev"
+  data-title="Ask Jason"
+  data-subtitle="Ask about experience, projects, strengths, and stack."
+  defer
+></script>
+
+<!-- Preview embed -->
+<script>
+  window.PortfolioChatbotConfig = {
+    apiBaseUrl: "https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev"
+  };
+</script>
+<script
+  src="https://your-preview-widget-cdn.example.com/widget.js"
+  data-api-base-url="https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev"
+  defer
+></script>

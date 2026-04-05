@@ -11,6 +11,10 @@ Embeddable recruiter-facing chatbot for a portfolio site. This project owns:
 
 ```text
 portfolio-chatbot/
+├── integration/
+│   └── portfolio/
+│       ├── embed-snippet.html
+│       └── tanstack-root-example.tsx
 ├── public/
 │   └── demo.html
 ├── data/
@@ -82,6 +86,59 @@ Recommended Worker URL shape:
 - preview API base URL: `https://chatbot-assistant-api-preview.<your-cloudflare-subdomain>.workers.dev`
 
 The widget should reference the API base URL, not the full `/api/chat` path. The widget appends `/api/chat` internally.
+
+## Embed Contract (Phase 3 Part 1)
+
+Global config:
+
+- `window.PortfolioChatbotConfig.apiBaseUrl` (required for chat requests)
+- `window.PortfolioChatbotConfig.title` (optional)
+- `window.PortfolioChatbotConfig.subtitle` (optional)
+- `window.PortfolioChatbotConfig.starterQuestions` (optional `string[]` or `|`-delimited string)
+
+Script `data-*` attributes (optional):
+
+- `data-api-base-url`
+- `data-title`
+- `data-subtitle`
+- `data-starter-questions` (pipe-delimited)
+
+Resolution order:
+
+1. explicit runtime override passed to `mount(...)`/`updateConfig(...)`
+2. `window.PortfolioChatbotConfig`
+3. script `data-*` attributes
+4. widget defaults
+
+Widget global API:
+
+- `window.PortfolioChatbotWidget.contractVersion`
+- `window.PortfolioChatbotWidget.mount(overrides?)`
+- `window.PortfolioChatbotWidget.unmount()`
+- `window.PortfolioChatbotWidget.updateConfig(overrides?)`
+- `window.PortfolioChatbotWidget.getConfig()`
+
+Current contract version: `1.0.0`
+
+## Widget Packaging (Phase 3 Part 2)
+
+`npm run build` now generates both stable and versioned assets in `dist/`:
+
+- `widget.js` and `widget.css` (stable latest)
+- `widget.v<package-version>.<hash>.js`
+- `widget.v<package-version>.<hash>.css`
+- `manifest.json`
+
+Use `manifest.json` if you want immutable, version-pinned URLs in production while still keeping `widget.js` for quick local testing.
+
+## Portfolio Integration (Phase 3 Part 3)
+
+Integration-ready artifacts:
+
+- HTML snippet: `integration/portfolio/embed-snippet.html`
+- TanStack root example: `integration/portfolio/tanstack-root-example.tsx`
+
+These are designed so the portfolio can load the widget once at app root, keep the site presentation-focused, and let the widget own chat UX/state.
 
 ## Worker secrets
 

@@ -1,4 +1,8 @@
 const STYLE_TEXT = __WIDGET_CSS__;
+const EMBED_CONTRACT_VERSION = "1.0.0";
+const WIDGET_GLOBAL_NAME = "PortfolioChatbotWidget";
+const CONFIG_GLOBAL_NAME = "PortfolioChatbotConfig";
+const WIDGET_HOST_ID = "portfolio-chatbot-widget";
 
 const DEFAULT_CONFIG = {
   title: "Ask Jason",
@@ -46,6 +50,39 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function normalizeStarterQuestions(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .slice(0, 6);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split("|")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+  }
+
+  return DEFAULT_CONFIG.starterQuestions;
+}
+
+function normalizeString(value, fallback = "") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function normalizeConfig(config = {}) {
+  return {
+    title: normalizeString(config.title, DEFAULT_CONFIG.title),
+    subtitle: normalizeString(config.subtitle, DEFAULT_CONFIG.subtitle),
+    apiBaseUrl: normalizeString(config.apiBaseUrl).replace(/\/$/, ""),
+    starterQuestions: normalizeStarterQuestions(config.starterQuestions),
+  };
 }
 
 function autoResizeTextarea(textarea) {
@@ -99,6 +136,19 @@ async function submitMessage(content) {
   const message = content.trim();
 
   if (!message) {
+    return;
+  }
+
+  if (!state.config.apiBaseUrl) {
+    state.conversation.push({
+      role: "assistant",
+      kind: "error",
+      note: "Widget configuration issue",
+      content:
+        "The chat widget is not configured with an API endpoint yet. Set apiBaseUrl in the embed config.",
+    });
+    renderMessages();
+    setStatus("Missing apiBaseUrl");
     return;
   }
 
@@ -274,21 +324,35 @@ function createMarkup(config) {
 }
 
 function resolveConfig(overrides = {}) {
-  const globalConfig = window.PortfolioChatbotConfig || {};
+  const globalConfig = window[CONFIG_GLOBAL_NAME] || {};
   const scriptConfig = EMBED_SCRIPT_CONFIG;
-  const apiBaseUrl = (
-    overrides.apiBaseUrl ||
-    globalConfig.apiBaseUrl ||
-    scriptConfig.apiBaseUrl ||
-    ""
-  ).replace(/\/$/, "");
-
-  return {
+  const mergedConfig = {
     ...DEFAULT_CONFIG,
     ...globalConfig,
     ...overrides,
-    apiBaseUrl,
+    apiBaseUrl:
+      overrides.apiBaseUrl ||
+      globalConfig.apiBaseUrl ||
+      scriptConfig.apiBaseUrl ||
+      "",
+    title:
+      overrides.title ||
+      globalConfig.title ||
+      scriptConfig.title ||
+      DEFAULT_CONFIG.title,
+    subtitle:
+      overrides.subtitle ||
+      globalConfig.subtitle ||
+      scriptConfig.subtitle ||
+      DEFAULT_CONFIG.subtitle,
+    starterQuestions:
+      overrides.starterQuestions ||
+      globalConfig.starterQuestions ||
+      scriptConfig.starterQuestions ||
+      DEFAULT_CONFIG.starterQuestions,
   };
+
+  return normalizeConfig(mergedConfig);
 }
 
 function mountWidget(overrides = {}) {
@@ -298,7 +362,7 @@ function mountWidget(overrides = {}) {
 
   const config = resolveConfig(overrides);
   const host = document.createElement("div");
-  host.id = "portfolio-chatbot-widget";
+  host.id = WIDGET_HOST_ID;
 
   const shadowRoot = host.attachShadow({ mode: "open" });
   shadowRoot.innerHTML = createMarkup(config);
@@ -329,8 +393,34 @@ function mountWidget(overrides = {}) {
   return state;
 }
 
-window.PortfolioChatbotWidget = {
+function unmountWidget() {
+  if (!state.mounted) {
+    return;
+  }
+
+  state.elements.host?.remove();
+  state.mounted = false;
+  state.open = false;
+  state.pending = false;
+  state.elements = {};
+  state.conversation = [];
+}
+
+function updateConfig(overrides = {}) {
+  state.config = resolveConfig(overrides);
+  if (state.mounted) {
+    unmountWidget();
+    mountWidget(state.config);
+  }
+  return state.config;
+}
+
+window[WIDGET_GLOBAL_NAME] = {
+  contractVersion: EMBED_CONTRACT_VERSION,
   mount: mountWidget,
+  unmount: unmountWidget,
+  updateConfig,
+  getConfig: () => ({ ...state.config }),
 };
 
 if (document.readyState === "loading") {
