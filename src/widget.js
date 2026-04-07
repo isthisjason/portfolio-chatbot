@@ -16,6 +16,7 @@ const DEFAULT_CONFIG = {
   source: "portfolio-widget",
   turnstileToken: "",
   turnstileSiteKey: "",
+  theme: "dark",
   starterQuestions: [
     "What kind of engineer is Jason?",
     "Which project best demonstrates full-stack ownership?",
@@ -111,6 +112,11 @@ function normalizeBoolean(value, fallback = true) {
   return fallback;
 }
 
+function normalizeTheme(value, fallback = "dark") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "light" || normalized === "dark" ? normalized : fallback;
+}
+
 function normalizeConfig(config = {}) {
   return {
     title: normalizeString(config.title, DEFAULT_CONFIG.title),
@@ -126,6 +132,7 @@ function normalizeConfig(config = {}) {
       config.turnstileSiteKey,
       DEFAULT_CONFIG.turnstileSiteKey,
     ),
+    theme: normalizeTheme(config.theme, DEFAULT_CONFIG.theme),
     starterQuestions: normalizeStarterQuestions(config.starterQuestions),
   };
 }
@@ -674,7 +681,7 @@ function attachEventHandlers() {
 function createMarkup(config) {
   return `
     <style>${STYLE_TEXT}</style>
-    <div class="pcw-root">
+    <div class="pcw-root" data-theme="${escapeHtml(config.theme)}">
       <div
         id="pcw-panel"
         class="pcw-panel"
@@ -689,10 +696,10 @@ function createMarkup(config) {
               <h2 class="pcw-title">${escapeHtml(config.title)}</h2>
             </div>
             <div class="pcw-header-actions">
-              <button class="pcw-clear" type="button" aria-label="Clear chat">
+              <button class="pcw-header-action pcw-clear" type="button" aria-label="Clear chat">
                 Clear
               </button>
-              <button class="pcw-close" type="button" aria-label="Close chat">
+              <button class="pcw-header-action pcw-close" type="button" aria-label="Close chat">
                 ×
               </button>
             </div>
@@ -786,6 +793,11 @@ function resolveConfig(overrides = {}) {
       globalConfig.turnstileSiteKey ||
       scriptConfig.turnstileSiteKey ||
       DEFAULT_CONFIG.turnstileSiteKey,
+    theme:
+      overrides.theme ||
+      globalConfig.theme ||
+      scriptConfig.theme ||
+      DEFAULT_CONFIG.theme,
   };
 
   return normalizeConfig(mergedConfig);
