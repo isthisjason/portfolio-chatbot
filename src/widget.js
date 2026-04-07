@@ -404,18 +404,30 @@ function setPending(nextPending) {
 function setOpen(nextOpen) {
   const wasOpen = state.open;
   state.open = nextOpen;
-  state.elements.panel.classList.toggle("is-open", nextOpen);
   state.elements.launcher.setAttribute("aria-expanded", String(nextOpen));
 
   if (nextOpen) {
+    state.elements.panel.classList.remove("is-closing");
+    state.elements.panel.classList.add("is-open");
     if (!wasOpen) {
       trackEvent("open");
     }
     state.previousFocusedElement = document.activeElement;
     state.elements.input.focus();
   } else {
+    state.elements.panel.classList.remove("is-open");
+    state.elements.panel.classList.add("is-closing");
+    const panel = state.elements.panel;
+    panel.addEventListener(
+      "animationend",
+      () => {
+        if (!state.open) {
+          panel.classList.remove("is-closing");
+        }
+      },
+      { once: true },
+    );
     const focusTarget =
-      state.previousFocusedElement &&
       state.previousFocusedElement instanceof HTMLElement
         ? state.previousFocusedElement
         : state.elements.launcher;
