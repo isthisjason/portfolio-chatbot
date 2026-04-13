@@ -857,11 +857,38 @@ function unmountWidget() {
 }
 
 function updateConfig(overrides = {}) {
-  state.config = resolveConfig(overrides);
-  if (state.mounted) {
-    unmountWidget();
-    mountWidget(state.config);
+  const previousConfig = state.config;
+  const nextConfig = resolveConfig(overrides);
+
+  state.config = nextConfig;
+
+  if (!state.mounted) {
+    return state.config;
   }
+
+  const onlyThemeChanged =
+    previousConfig.title === nextConfig.title &&
+    previousConfig.subtitle === nextConfig.subtitle &&
+    previousConfig.apiBaseUrl === nextConfig.apiBaseUrl &&
+    previousConfig.analyticsEnabled === nextConfig.analyticsEnabled &&
+    previousConfig.source === nextConfig.source &&
+    previousConfig.turnstileToken === nextConfig.turnstileToken &&
+    previousConfig.turnstileSiteKey === nextConfig.turnstileSiteKey &&
+    JSON.stringify(previousConfig.starterQuestions) ===
+      JSON.stringify(nextConfig.starterQuestions) &&
+    previousConfig.theme !== nextConfig.theme;
+
+  if (onlyThemeChanged) {
+    const root =
+      state.elements.host?.shadowRoot?.querySelector(".pcw-root") || null;
+    if (root) {
+      root.setAttribute("data-theme", nextConfig.theme);
+    }
+    return state.config;
+  }
+
+  unmountWidget();
+  mountWidget(state.config);
   return state.config;
 }
 
