@@ -17,7 +17,7 @@ Guidelines:
 
 - Only include facts you are comfortable exposing publicly.
 - Prefer short, evidence-based statements over marketing language.
-- Add projects and experience entries in a format recruiters can skim.
+- Add projects and experience entries in a format that is easy to skim.
 - Keep sensitive or non-public details out of these files.
 
 Maintenance routine:

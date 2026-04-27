@@ -1,11 +1,8 @@
 # portfolio-chatbot
 
-Embeddable recruiter-facing chatbot for a portfolio site. This project owns:
+Embeddable chatbot widget for my portfolio site. It gives visitors a quick way to ask about my projects, experience, stack, and the work I am actively building.
 
-- the floating widget UI
-- the `/api/chat` backend on a Cloudflare Worker
-- the system prompt and structured portfolio context
-- the deployment boundary separate from the main portfolio app
+This project owns the floating widget UI, the `/api/chat` backend on a Cloudflare Worker, the system prompt, and the structured portfolio context. It stays separate from the main portfolio app so the chat experience can be developed, tested, and deployed on its own.
 
 ## Repo structure
 
@@ -328,7 +325,7 @@ Current defaults:
 Notes:
 
 - this rate limiting is isolate-local, so it is intentionally lightweight rather than durable
-- it is good enough as a first pass for recruiter-facing widget traffic
+- it is good enough as a first pass for normal portfolio widget traffic
 - if traffic grows, the next step is durable rate limiting with Cloudflare KV, Durable Objects, or another shared store
 
 ## Analytics and observability
@@ -393,7 +390,7 @@ Before calling Phase 2 complete, the Worker now enforces and verifies these laun
 - unsupported-claim-risk responses are converted into a safe fallback
 - sensitive personal questions get a refusal before provider output is shown
 - missing-context answers are normalized into an honest fallback
-- successful answers are trimmed into concise recruiter-facing length
+- successful answers are trimmed into a concise professional length
 
 Run the guardrail checks:
 
@@ -487,7 +484,7 @@ What to verify in the widget:
 
 ## Widget UX and Accessibility
 
-Recent recruiter-flow polish includes:
+Recent widget polish includes:
 
 - refined welcome copy and starter prompts for concise professional framing
 - explicit loading indicator while the assistant is thinking
@@ -589,10 +586,10 @@ The prompt logic lives in `worker/context.js`, but the source data now lives und
 Current guardrails:
 
 - answers stay grounded in structured portfolio context
-- concise recruiter-facing tone
+- concise professional tone
 - fallback when evidence is missing
 - refusal for sensitive personal information or invented claims
-- safe recruiter-facing fallback when the provider fails or configuration is missing
+- safe professional fallback when the provider fails or configuration is missing
 
 ## Suggested next steps
 
